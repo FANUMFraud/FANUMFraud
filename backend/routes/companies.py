@@ -16,6 +16,7 @@ from schemas import (
     CompanyCreate,
     CompanyResponse,
     CompanyScoreResponse,
+    RiskMomentum,
     ScorePoint,
 )
 
@@ -32,13 +33,14 @@ def list_companies(
     db: Session = Depends(get_db),
 ):
     # Return all companies ordered by current_score ascending (worst first)
-    return (
+    companies = (
         db.query(Company)
         .order_by(Company.current_score.asc())
         .offset(skip)
         .limit(limit)
         .all()
     )
+    return [_company_response(company, db) for company in companies]
 
 
 # GET /companies/search
@@ -79,7 +81,7 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
     company = db.query(Company).get(company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    return company
+    return _company_response(company, db)
 
 
 # GET /companies/{company_id}/score
@@ -109,8 +111,70 @@ def get_company_score(
     return CompanyScoreResponse(
         company_id=company.id,
         current_score=company.current_score,
+        momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
+        momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
         history=[ScorePoint.model_validate(h) for h in history],
     )
+
+
+def _company_response(company: Company, db: Session) -> CompanyResponse:
+    return CompanyResponse(
+        id=company.id,
+        name=company.name,
+        nip=company.nip,
+        current_score=company.current_score,
+        created_at=company.created_at,
+        momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
+        momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
+    )
+
+
+def _risk_momentum(
+    db: Session,
+    company_id: int,
+    current_score: float,
+    window_days: int,
+) -> RiskMomentum | None:
+    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    past_point = (
+        db.query(ScoreHistory)
+        .filter(
+            ScoreHistory.company_id == company_id,
+            ScoreHistory.recorded_at <= cutoff,
+        )
+        .order_by(ScoreHistory.recorded_at.desc(), ScoreHistory.id.desc())
+        .first()
+    )
+    if past_point is None:
+        past_point = (
+            db.query(ScoreHistory)
+            .filter(ScoreHistory.company_id == company_id)
+            .order_by(ScoreHistory.recorded_at.asc(), ScoreHistory.id.asc())
+            .first()
+        )
+    if past_point is None:
+        return None
+
+    delta = round(float(current_score) - float(past_point.score), 2)
+    return RiskMomentum(
+        window_days=window_days,
+        current_score=round(float(current_score), 2),
+        past_score=round(float(past_point.score), 2),
+        delta=delta,
+        label=_momentum_label(delta),
+    )
+
+
+def _momentum_label(delta: float) -> str:
+    if delta <= -20.0:
+        return "rapid_deterioration"
+    if delta <= -5.0:
+        return "declining"
+    if delta < 5.0:
+        return "stable"
+    if delta < 20.0:
+        return "recovering"
+    return "strong_recovery"
 
 
 # GET /companies/{company_id}/articles

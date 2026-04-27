@@ -15,6 +15,14 @@ class CompanyCreate(BaseModel):
     aliases: list[str] = Field(default_factory=list)
 
 
+class RiskMomentum(BaseModel):
+    window_days: int
+    current_score: float
+    past_score: float
+    delta: float
+    label: str
+
+
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,6 +31,8 @@ class CompanyResponse(BaseModel):
     nip: str | None
     current_score: float
     created_at: datetime
+    momentum_7d: RiskMomentum | None = None
+    momentum_30d: RiskMomentum | None = None
 
 
 class ScorePoint(BaseModel):
@@ -37,6 +47,8 @@ class ScorePoint(BaseModel):
 class CompanyScoreResponse(BaseModel):
     company_id: int
     current_score: float
+    momentum_7d: RiskMomentum | None = None
+    momentum_30d: RiskMomentum | None = None
     history: list[ScorePoint]
 
 
