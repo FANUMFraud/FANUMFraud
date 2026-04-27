@@ -90,11 +90,26 @@ async def lifespan(app: FastAPI):
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from pipeline.ingest import run_ingest
+        from pipeline.processor import process_pending_articles
 
         scheduler = BackgroundScheduler()
-        scheduler.add_job(run_ingest, "interval", minutes=15)
+        
+        # RSS ingestion co 15 minut
+        scheduler.add_job(run_ingest, "interval", minutes=15, id="ingest-rss", replace_existing=True)
+        logger.info("Scheduled: run_ingest co 15 minut")
+        
+        # Przetwarzanie artykułów co 5 minut
+        scheduler.add_job(
+            process_pending_articles, 
+            "interval", 
+            minutes=5, 
+            id="process-articles",
+            replace_existing=True
+        )
+        logger.info("Scheduled: process_pending_articles co 5 minut")
+        
         scheduler.start()
-        logger.info("Scheduler uruchomiony — ingest co 15 minut")
+        logger.info("Scheduler uruchomiony")
     except Exception as e:
         logger.warning(f"Scheduler nie uruchomiony: {e}")
 
