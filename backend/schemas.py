@@ -3,7 +3,11 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _round_score(value: float | int | None) -> float:
+    return round(float(value or 0.0), 2)
 
 
 # Company
@@ -22,6 +26,11 @@ class RiskMomentum(BaseModel):
     delta: float
     label: str
 
+    @field_validator("current_score", "past_score", "delta", mode="before")
+    @classmethod
+    def _round_momentum_scores(cls, value: float | int | None) -> float:
+        return _round_score(value)
+
 
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -34,6 +43,11 @@ class CompanyResponse(BaseModel):
     momentum_7d: RiskMomentum | None = None
     momentum_30d: RiskMomentum | None = None
 
+    @field_validator("current_score", mode="before")
+    @classmethod
+    def _round_current_score(cls, value: float | int | None) -> float:
+        return _round_score(value)
+
 
 class ScorePoint(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -43,6 +57,11 @@ class ScorePoint(BaseModel):
     category: str | None
     recorded_at: datetime
 
+    @field_validator("score", "risk_score", mode="before")
+    @classmethod
+    def _round_score_points(cls, value: float | int | None) -> float:
+        return _round_score(value)
+
 
 class CompanyScoreResponse(BaseModel):
     company_id: int
@@ -50,6 +69,11 @@ class CompanyScoreResponse(BaseModel):
     momentum_7d: RiskMomentum | None = None
     momentum_30d: RiskMomentum | None = None
     history: list[ScorePoint]
+
+    @field_validator("current_score", mode="before")
+    @classmethod
+    def _round_current_score(cls, value: float | int | None) -> float:
+        return _round_score(value)
 
 
 # Article
@@ -61,6 +85,7 @@ class ArticleResponse(BaseModel):
     id: int
     url: str | None
     title: str | None
+    content: str | None = None
     source: str | None
     published_at: datetime | None
     processed: bool

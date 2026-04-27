@@ -16,6 +16,23 @@ export interface Company {
   nip?: string | null;
   current_score: number;
   created_at: string;
+  momentum_7d?: RiskMomentum | null;
+  momentum_30d?: RiskMomentum | null;
+}
+
+export type MomentumLabel =
+  | 'rapid_deterioration'
+  | 'declining'
+  | 'stable'
+  | 'recovering'
+  | 'strong_recovery';
+
+export interface RiskMomentum {
+  window_days: number;
+  current_score: number;
+  past_score: number;
+  delta: number;
+  label: MomentumLabel;
 }
 
 export interface ScorePoint {
@@ -28,16 +45,20 @@ export interface ScorePoint {
 export interface CompanyScoreResponse {
   company_id: number;
   current_score: number;
+  momentum_7d?: RiskMomentum | null;
+  momentum_30d?: RiskMomentum | null;
   history: ScorePoint[];
 }
 
 export interface Article {
   id: number;
-  url: string;
-  title: string;
-  source?: string;
-  published_at?: string;
+  url?: string | null;
+  title?: string | null;
+  content?: string | null;
+  source?: string | null;
+  published_at?: string | null;
   processed: boolean;
+  created_at?: string;
 }
 
 // ─── API Functions ────────────────────────────────────────────────────────────
@@ -62,3 +83,6 @@ export const searchCompanies = (q: string): Promise<Company[]> =>
 
 export const getArticles = (): Promise<Article[]> =>
   api.get<Article[]>('/articles').then((r) => r.data);
+
+export const getArticle = (id: number): Promise<Article> =>
+  api.get<Article>(`/articles/${id}`).then((r) => r.data);

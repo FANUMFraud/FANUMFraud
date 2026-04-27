@@ -9,7 +9,7 @@ import LocaleFade from '@/components/LocaleFade';
 import { getRiskLevel } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
-type SortMode = 'risk_desc' | 'risk_asc' | 'name';
+type SortMode = 'risk_desc' | 'risk_asc' | 'trend_desc' | 'name';
 
 export default function DashboardPage() {
   const { t, locale, formatTime, formatDate } = useI18n();
@@ -42,6 +42,7 @@ export default function DashboardPage() {
   const sorted = [...companies].sort((a, b) => {
     if (sort === 'risk_desc') return a.current_score - b.current_score;
     if (sort === 'risk_asc') return b.current_score - a.current_score;
+    if (sort === 'trend_desc') return (a.momentum_7d?.delta ?? 0) - (b.momentum_7d?.delta ?? 0);
     return a.name.localeCompare(b.name, locale === 'pl' ? 'pl' : 'en');
   });
 
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const sortOptions: ReadonlyArray<readonly [SortMode, string]> = [
     ['risk_desc', t.dashboard.sortRiskDesc],
     ['risk_asc', t.dashboard.sortRiskAsc],
+    ['trend_desc', locale === 'pl' ? 'Trend ↓' : 'Trend ↓'],
     ['name', t.dashboard.sortName],
   ];
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import LanguageSwitcher from './LanguageSwitcher';
 import ThemeSwitcher from './ThemeSwitcher';
 import { useI18n } from '@/lib/i18n/I18nProvider';
@@ -26,15 +27,17 @@ export default function Header({ rightSlot, leftSlot }: Props) {
               aria-label="FanumFraud"
             >
               <span
-                className="inline-flex items-center justify-center w-9 h-9"
-                style={{ background: 'var(--brand-bg)' }}
+                className="inline-flex items-center justify-center w-9 h-9 overflow-hidden"
+                style={{ background: '#000000' }}
               >
-                <span
-                  className="text-[10px] font-bold tracking-[0.18em]"
-                  style={{ color: 'var(--brand-fg)' }}
-                >
-                  FF
-                </span>
+                <Image
+                  src="/assets/favicon/android-chrome-192x192.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  priority
+                  aria-hidden="true"
+                />
               </span>
               <span className="flex flex-col leading-tight">
                 <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--ink-muted)]">

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { Company } from '@/lib/api';
-import { getRiskLevel } from '@/lib/risk';
+import { formatMomentumDelta, getRiskLevel, momentumSymbol, momentumTone } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
 interface Props {
@@ -32,9 +32,17 @@ const riskTone = {
 } as const;
 
 export default function CompanyCard({ company, animationDelay = 0 }: Props) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const risk = getRiskLevel(company.current_score);
   const tone = riskTone[risk];
+  const momentum = company.momentum_7d;
+  const momentumDelta = momentum?.delta ?? 0;
+  const momentumDirection = momentumTone(momentumDelta);
+  const momentumStyle = {
+    bad: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+    neutral: 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+    good: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  } as const;
   const labels = {
     high: t.card.riskHigh,
     medium: t.card.riskMedium,
@@ -82,6 +90,16 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
               </span>
             </p>
           </div>
+          {momentum && (
+            <div className={`px-2.5 py-1.5 border text-right ${momentumStyle[momentumDirection]}`}>
+              <p className="text-[10px] uppercase tracking-[0.1em] font-semibold">
+                {locale === 'pl' ? 'Trend 7d' : '7d trend'}
+              </p>
+              <p className="text-sm font-semibold tnum leading-none mt-1">
+                {momentumSymbol(momentumDelta)} {formatMomentumDelta(momentumDelta)}
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="h-1 w-full bg-[var(--paper-2)] border-t border-[var(--rule)]">

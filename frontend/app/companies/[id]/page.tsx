@@ -16,7 +16,7 @@ import AlertBanner from '@/components/AlertBanner';
 import Header from '@/components/Header';
 import LocaleFade from '@/components/LocaleFade';
 import Link from 'next/link';
-import { getRiskLevel, scoreDrop } from '@/lib/risk';
+import { formatMomentumDelta, getRiskLevel, momentumSymbol, momentumTone, scoreDrop } from '@/lib/risk';
 import { CATEGORY_ORDER, normalizeCategory, type CanonicalCategory } from '@/lib/categories';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
@@ -37,6 +37,43 @@ const riskRuleVar = {
   medium: 'var(--risk-medium-rule)',
   low: 'var(--risk-low-rule)',
 } as const;
+
+const momentumToneStyles = {
+  bad: {
+    color: 'var(--risk-high)',
+    background: 'var(--risk-high-bg)',
+    border: 'var(--risk-high-rule)',
+  },
+  neutral: {
+    color: 'var(--ink-muted)',
+    background: 'var(--surface-alt)',
+    border: 'var(--border)',
+  },
+  good: {
+    color: 'var(--risk-low)',
+    background: 'var(--risk-low-bg)',
+    border: 'var(--risk-low-rule)',
+  },
+} as const;
+
+function momentumLabel(label: string | undefined, locale: string): string {
+  const pl = {
+    rapid_deterioration: 'Gwałtowne pogorszenie',
+    declining: 'Pogarsza się',
+    stable: 'Stabilnie',
+    recovering: 'Odbudowa',
+    strong_recovery: 'Silna odbudowa',
+  } as const;
+  const en = {
+    rapid_deterioration: 'Rapid deterioration',
+    declining: 'Declining',
+    stable: 'Stable',
+    recovering: 'Recovering',
+    strong_recovery: 'Strong recovery',
+  } as const;
+  const dictionary = locale === 'pl' ? pl : en;
+  return dictionary[label as keyof typeof dictionary] ?? dictionary.stable;
+}
 
 function checkScoreDelta(history: ScorePoint[] | undefined): { show: boolean; delta?: number } {
   if (!history || history.length < 2) return { show: false };
@@ -151,8 +188,6 @@ export default function CompanyDetailPage() {
     low: t.detail.exposureLow,
   } as const;
 
-  const { show: showAlert, delta: scoreDelta } = checkScoreDelta(scoreData.history);
-
   const categoryCounts = scoreData.history.reduce((acc, point) => {
     const category = normalizeCategory(point.category);
     acc[category] = (acc[category] ?? 0) + 1;
@@ -170,6 +205,14 @@ export default function CompanyDetailPage() {
   const formattedDate = formatDate(company.created_at);
   const max = scoreData.history.length > 0 ? Math.max(...scoreData.history.map((p) => p.score)) : null;
   const min = scoreData.history.length > 0 ? Math.min(...scoreData.history.map((p) => p.score)) : null;
+  const momentum7d = scoreData.momentum_7d ?? company.momentum_7d;
+  const momentum30d = scoreData.momentum_30d ?? company.momentum_30d;
+  const dominantCategory = categoryCards[0]?.label ?? (locale === 'pl' ? 'Brak dominującej kategorii' : 'No dominant category');
+  const latestArticle = articles[0];
+  const fallbackAlert = checkScoreDelta(scoreData.history);
+  const backendDrop = momentum7d && momentum7d.delta <= -20 ? Math.abs(momentum7d.delta) : undefined;
+  const showAlert = backendDrop != null || fallbackAlert.show;
+  const scoreDelta = backendDrop ?? fallbackAlert.delta;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -267,6 +310,97 @@ export default function CompanyDetailPage() {
             </section>
 
             <section>
+              <h2 className="section-title">
+                {locale === 'pl' ? 'Trend reputacji' : 'Reputation trend'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border border-[var(--border)] bg-[var(--surface)]">
+                {[momentum7d, momentum30d].map((momentum, index) => {
+                  const delta = momentum?.delta ?? 0;
+                  const toneStyle = momentumToneStyles[momentumTone(delta)];
+                  const windowLabel = index === 0 ? '7d' : '30d';
+                  return (
+                    <div
+                      key={windowLabel}
+                      className={[
+                        'p-5 sm:p-6',
+                        index === 0 ? 'border-b md:border-b-0 md:border-r border-[var(--border)]' : '',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="eyebrow mb-2">
+                            {locale === 'pl' ? `Momentum ${windowLabel}` : `${windowLabel} momentum`}
+                          </p>
+                          <p className="text-[34px] font-semibold tnum leading-none" style={{ color: toneStyle.color }}>
+                            {momentum ? `${momentumSymbol(delta)} ${formatMomentumDelta(delta)}` : '—'}
+                          </p>
+                        </div>
+                        <span
+                          className="px-2 py-1 border text-[10px] uppercase tracking-[0.1em] font-semibold"
+                          style={{ color: toneStyle.color, background: toneStyle.background, borderColor: toneStyle.border }}
+                        >
+                          {momentumLabel(momentum?.label, locale)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-[var(--ink-2)] mt-4 leading-relaxed">
+                        {momentum
+                          ? locale === 'pl'
+                            ? `Zmiana z ${momentum.past_score.toFixed(0)} do ${momentum.current_score.toFixed(0)} punktów w oknie ${momentum.window_days} dni.`
+                            : `Moved from ${momentum.past_score.toFixed(0)} to ${momentum.current_score.toFixed(0)} points over ${momentum.window_days} days.`
+                          : locale === 'pl'
+                            ? 'Brak wystarczającej historii do obliczenia trendu.'
+                            : 'Not enough history to calculate trend.'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section>
+              <h2 className="section-title">
+                {locale === 'pl' ? 'Dlaczego taki scoring?' : 'Why this score?'}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-[var(--border)] bg-[var(--surface)]">
+                {[
+                  {
+                    label: locale === 'pl' ? 'Dominująca kategoria' : 'Dominant category',
+                    value: dominantCategory,
+                    help: locale === 'pl'
+                      ? 'Najczęściej występujący typ ryzyka w historii scoringu.'
+                      : 'Most frequent risk type in the score history.',
+                  },
+                  {
+                    label: locale === 'pl' ? 'Ostatni sygnał' : 'Latest signal',
+                    value: latestArticle?.source ?? (locale === 'pl' ? 'Brak publikacji' : 'No coverage'),
+                    help: latestArticle?.published_at
+                      ? formatDate(latestArticle.published_at, { day: '2-digit', month: 'short', year: 'numeric' })
+                      : locale === 'pl' ? 'Nie wykryto powiązanych artykułów.' : 'No related articles detected.',
+                  },
+                  {
+                    label: locale === 'pl' ? 'Wolumen dowodów' : 'Evidence volume',
+                    value: scoreData.history.length.toString(),
+                    help: locale === 'pl'
+                      ? 'Liczba punktów historii wpływających na profil reputacyjny.'
+                      : 'Number of history points shaping the reputation profile.',
+                  },
+                ].map((item, index) => (
+                  <div
+                    key={item.label}
+                    className={[
+                      'p-5 sm:p-6',
+                      index !== 2 ? 'border-b md:border-b-0 md:border-r border-[var(--border)]' : '',
+                    ].join(' ')}
+                  >
+                    <p className="eyebrow mb-2">{item.label}</p>
+                    <p className="text-xl font-semibold text-[var(--ink)] leading-tight">{item.value}</p>
+                    <p className="text-sm text-[var(--ink-muted)] mt-3 leading-relaxed">{item.help}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section>
               <h2 className="section-title">{t.detail.chartTitle}</h2>
               <ScoreChart history={scoreData.history} />
             </section>
@@ -310,15 +444,13 @@ export default function CompanyDetailPage() {
                         {String(i + 1).padStart(2, '0')}
                       </span>
                       <div className="flex-1 min-w-0">
-                        <a
-                          href={article.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <Link
+                          href={`/articles/${article.id}`}
                           className="font-medium text-[var(--ink)] hover:text-[var(--link)] leading-snug block"
                           style={{ textDecorationColor: 'var(--rule)' }}
                         >
-                          {article.title}
-                        </a>
+                          {article.title || (locale === 'pl' ? 'Artykul bez tytulu' : 'Untitled article')}
+                        </Link>
                         <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--ink-muted)]">
                           {article.source && (
                             <span>
@@ -342,7 +474,7 @@ export default function CompanyDetailPage() {
                         className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0 mt-1"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-4-4l8-8m0 0H8m8 0v8" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </li>
                   ))}
