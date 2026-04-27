@@ -22,7 +22,9 @@ from schemas import (
     RiskMomentum,
     SanctionsCheck,
     ScorePoint,
+    StockPriceData,
 )
+from stock_fetcher import StooqPriceFetcher
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -85,7 +87,21 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
     company = db.query(Company).get(company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    return _company_response(company, db)
+    response = _company_response(company, db)
+    
+    # DODANE: Pobierz aktualną cenę akcji
+    if company.ticker_gpw:
+        try:
+            stock_data = StooqPriceFetcher.fetch_current_price(company.ticker_gpw)
+            if stock_data:
+                response.stock_price = StockPriceData(
+                    price=stock_data['price'],
+                    change_percent=stock_data['price_change']
+                )
+        except Exception as e:
+            logger.warning(f"Failed to fetch stock price for {company.ticker_gpw}: {e}")
+            
+    return response
 
 
 # GET /companies/{company_id}/score
@@ -129,6 +145,7 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         nip=company.nip,
         current_score=company.current_score,
         created_at=company.created_at,
+        ticker_gpw=company.ticker_gpw,
         momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
         momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
         sanctions=SanctionsCheck(**sanctions),

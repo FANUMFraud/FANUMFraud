@@ -129,6 +129,76 @@ class ReputationScorer:
 
         return points
 
+    def apply_stock_price_penalty(
+        self,
+        base_score: float,
+        price_change_percent: float
+    ) -> float:
+        """
+        Stosuje penalty/bonus do scoringu na podstawie zmiany ceny akcji
+        
+        Args:
+            base_score: Bieżący scoring (0-100)
+            price_change_percent: Zmiana ceny w % (np. -2.5 lub +3.0)
+        
+        Returns:
+            Zmodyfikowany score (clamped do 0-100)
+        
+        Logika:
+        - Każdy 1% spadku ceny = -0.5 punktu do scoringu
+        - Każdy 1% wzrostu ceny = +0.5 punktu do scoringu
+        
+        Przykłady:
+        - base_score=50, cena spadła 4% → 50 - (4 * 0.5) = 48
+        - base_score=50, cena wzrosła 2% → 50 + (2 * 0.5) = 51
+        """
+        # Jeśli cena nie uległa zmianie
+        if price_change_percent == 0:
+            return base_score
+        
+        # Aplikuj penalty/bonus: 0.5 punktu na 1% zmiany
+        adjustment = price_change_percent * 0.5
+        
+        # Nowy score
+        new_score = base_score + adjustment
+        
+        # Clamp do zakresu [min_score, max_score]
+        return _clamp(new_score, self.min_score, self.max_score)
+
+    def apply_industry_modifier(
+        self,
+        base_risk_score: float,
+        industry: str,
+        category: str | None
+    ) -> float:
+        """
+        Modyfikuje risk_score sygnału w zależności od branży i kategorii ryzyka.
+        """
+        if not industry or not category:
+            return base_risk_score
+
+        industry = industry.lower()
+        category = category.lower()
+
+        multiplier = 1.0
+
+        if industry in ("finance", "banking", "payments", "insurance"):
+            if category in ("money_laundering", "sanctions", "regulatory", "fraud"):
+                multiplier = 1.5
+        elif industry in ("energy", "mining", "manufacturing", "construction"):
+            if category in ("corruption", "governance"):
+                multiplier = 1.3
+        elif industry in ("technology", "software"):
+            if category in ("fraud", "governance"):
+                multiplier = 1.2
+        elif industry in ("pharma", "healthcare"):
+            if category in ("regulatory", "corruption", "sanctions"):
+                multiplier = 1.4
+
+        new_score = base_risk_score * multiplier
+        return _clamp(new_score, 0.0, 100.0)
+
+
 
 def signal_from_analysis(
     analysis: Mapping[str, Any],

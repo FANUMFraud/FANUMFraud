@@ -19,8 +19,9 @@ except Exception:  # pragma: no cover - optional dependency in local dev
 
 from analyzer import ArticleAnalyzer, ArticleInput, ArticleRiskAnalysis
 from database import SessionLocal
-from models import Article, Company, ScoreHistory
+from models import Article, Company, ScoreHistory, StockPrice
 from scorer import ReputationScorer, RiskSignal
+from stock_fetcher import StooqPriceFetcher
 
 log = logging.getLogger(__name__)
 
@@ -157,15 +158,39 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
                 category = _pick_category(analysis)
 
                 for company_id in matched_company_ids:
-                    new_score = _compute_company_score(
-                        db, scorer, company_id, signal, article.published_at
+                    company = db.get(Company, company_id)
+                    signal_risk_score = signal.risk_score
+                    
+                    if company and company.industry:
+                        signal_risk_score = scorer.apply_industry_modifier(
+                            signal.risk_score, company.industry, category
+                        )
+                        
+                    company_signal = RiskSignal(
+                        timestamp=signal.timestamp,
+                        risk_score=signal_risk_score,
+                        confidence=signal.confidence,
+                        sentiment=signal.sentiment,
+                        source_weight=signal.source_weight,
+                        article_id=signal.article_id,
+                        metadata=signal.metadata
                     )
+
+                    new_score = _compute_company_score(
+                        db, scorer, company_id, company_signal, article.published_at
+                    )
+                    
+                    # DODANE: Pobierz cenę akcji i zastosuj wpływ na scoring
+                    price_change = _get_stock_price_change(company_id)
+                    if price_change is not None:
+                        new_score = scorer.apply_stock_price_penalty(new_score, price_change)
+                    
                     db.add(
                         ScoreHistory(
                             company_id=company_id,
                             article_id=article.id,
                             score=new_score,
-                            risk_score=signal.risk_score,
+                            risk_score=company_signal.risk_score,
                             category=category,
                             recorded_at=_as_db_datetime(signal.timestamp),
                         )
@@ -487,6 +512,61 @@ def _token_similarity(left: str, right: str) -> float:
     if fuzz is not None:
         return float(fuzz.token_set_ratio(left, right))
     return SequenceMatcher(a=left, b=right).ratio() * 100.0
+
+
+def _get_stock_price_change(company_id: int) -> float | None:
+    """
+    Pobiera ostatnią zmianę ceny % dla firmy
+    
+    Returns: Float (zmiana %), lub None jeśli nie ma danych
+    """
+    db = SessionLocal()
+    try:
+        company = db.query(Company).get(company_id)
+        if not company or not company.ticker_gpw:
+            return None
+        
+        price_data = StooqPriceFetcher.fetch_current_price(company.ticker_gpw)
+        if not price_data:
+            return None
+        
+        # Zapisz historię ceny
+        _save_stock_price_history(db, company_id, price_data)
+        
+        return price_data['price_change']  # % zmiana
+    
+    except Exception as e:
+        log.error(f"Failed to get stock price for company {company_id}: {e}")
+        return None
+    finally:
+        db.close()
+
+
+def _save_stock_price_history(db: Session, company_id: int, price_data: dict) -> None:
+    """
+    Zapisuje cenę akcji w historii
+    """
+    if not price_data:
+        return
+    
+    try:
+        company = db.query(Company).get(company_id)
+        if not company or not company.ticker_gpw:
+            return
+        
+        stock_price = StockPrice(
+            company_id=company_id,
+            ticker=company.ticker_gpw,
+            price=price_data['price'],
+            price_change_percent=price_data['price_change'],
+            recorded_at=price_data['timestamp']
+        )
+        db.add(stock_price)
+        db.commit()
+        log.debug(f"Saved stock price for company {company_id}: {price_data['price']} ({price_data['price_change']}%)")
+    except Exception as e:
+        log.error(f"Failed to save stock price for company {company_id}: {e}")
+        db.rollback()
 
 
 __all__ = ["process_pending_articles"]

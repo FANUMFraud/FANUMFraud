@@ -31,6 +31,11 @@ export interface Company {
   momentum_7d?: RiskMomentum | null;
   momentum_30d?: RiskMomentum | null;
   sanctions?: SanctionsCheck | null;
+  ticker_gpw?: string | null;
+  stock_price?: {
+    price: number;
+    change_percent: number;
+  } | null;
 }
 
 export type MomentumLabel =
