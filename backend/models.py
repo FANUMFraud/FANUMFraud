@@ -1,36 +1,49 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.sql import func
+
 from database import Base
 
+
+# Firma w systemie monitorowania reputacji
 class Company(Base):
     __tablename__ = "companies"
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=False)
-    nip = Column(String, unique=True, nullable=True)
-    aliases = Column(Text)
+    nip = Column(String, nullable=True)
+    isin = Column(String, nullable=True)
+    ticker_gpw = Column(String, nullable=True)
+    industry = Column(String, nullable=True)
+    aliases = Column(Text, nullable=True)
     current_score = Column(Float, default=100.0)
     created_at = Column(DateTime, server_default=func.now())
 
+
+# Artykuł prasowy
 class Article(Base):
     __tablename__ = "articles"
 
-    id = Column(Integer, primary_key=True)
-    url = Column(String, unique=True)
-    title = Column(String)
-    content = Column(Text)
-    source = Column(String)
-    published_at = Column(DateTime)
-    processed = Column(Integer, default=0)
-    created_at = Column(DateTime, server_default=func.now())
+    id: int = Column(Integer, primary_key=True)
+    url: str = Column(String(2048), unique=True, nullable=False, index=True)
+    title: str = Column(String(512), nullable=False)
+    content: str = Column(Text, nullable=False)
+    source: str = Column(String(255), nullable=False, index=True)
+    published_at: datetime = Column(DateTime, nullable=False)
+    processed: bool = Column(Boolean, default=False, index=True)
+    created_at: datetime = Column(DateTime, server_default=func.now())
 
+
+# Historia scoringu
 class ScoreHistory(Base):
     __tablename__ = "scores_history"
 
-    id = Column(Integer, primary_key=True)
-    company_id = Column(Integer, ForeignKey("companies.id"))
-    score = Column(Float)
-    risk_score = Column(Float)
-    category = Column(String, default="neutralny")
-    article_id = Column(Integer, ForeignKey("articles.id"))
-    recorded_at = Column(DateTime, server_default=func.now())
+    id: int = Column(Integer, primary_key=True)
+    company_id: int = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    article_id: Optional[int] = Column(Integer, ForeignKey("articles.id"), nullable=True, index=True)
+    score: float = Column(Float, nullable=False)
+    risk_score: float = Column(Float, nullable=False)
+    category: Optional[str] = Column(String(50), nullable=True)
+    recorded_at: datetime = Column(DateTime, server_default=func.now(), index=True)
