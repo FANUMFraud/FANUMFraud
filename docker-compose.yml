@@ -1,7 +1,10 @@
 services:
   postgres:
     image: postgres:16-alpine
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
+      POSTGRES_DB: ${POSTGRES_DB:-fanumfraud}
     ports:
       - "5432:5432"
     volumes:
@@ -35,12 +38,41 @@ services:
       interval: 10s
       retries: 10
 
+  seed-demo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: python scripts/seed_demo.py --per-company 150
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
+      POSTGRES_DB: ${POSTGRES_DB:-fanumfraud}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
+      POSTGRES_DB: ${POSTGRES_DB:-fanumfraud}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -50,6 +82,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+      seed-demo:
+        condition: service_completed_successfully
 
 volumes:
   postgres_data:

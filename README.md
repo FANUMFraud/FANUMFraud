@@ -26,6 +26,10 @@ This project was built for the Transparent Data hackathon challenge:
 - Data layer:
   - PostgreSQL for core data,
   - Elasticsearch for fuzzy company search (with SQL fallback).
+- Demo data:
+  - Docker Compose runs `seed-demo` automatically,
+  - seed creates 12 fictional companies, 1800 demo articles and score history points,
+  - seed is deterministic and safe to run multiple times.
 
 ## Architecture
 
@@ -51,9 +55,11 @@ Main backend flow:
 
 ## Quick start (Docker)
 
-### 1) Prepare env file
+### 1) Optional env file
 
-Create `.env` in project root (based on `.env.example`), for example:
+Docker Compose has safe local defaults, so `.env` is optional for demo mode.
+
+If you want to override settings or add an LLM key, create `.env` in project root based on `.env.example`:
 
 ```env
 POSTGRES_USER=fanumfraud
@@ -72,11 +78,18 @@ Notes:
 - `OPENROUTER_API_KEY` is optional. Without it, analyzer uses heuristic fallback.
 - Do not commit `.env`.
 
-### 2) Run stack
+### 2) Run stack with demo data
 
 ```bash
 docker compose up --build
 ```
+
+The `seed-demo` service runs automatically and populates PostgreSQL with fictional demo data.
+
+Expected default seed size:
+- 12 companies,
+- 1800 articles,
+- score history for demo signals and trend points.
 
 ### 3) Open apps
 
@@ -104,6 +117,14 @@ npm run dev
 ```
 
 Frontend expects backend at `http://localhost:8000` by default (`NEXT_PUBLIC_API_URL`).
+
+## Rerun demo seed manually
+
+```bash
+docker compose run --rm seed-demo
+```
+
+The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts the same deterministic dataset again.
 
 ## Useful manual pipeline commands
 
@@ -157,6 +178,7 @@ npm run build
 Implemented and integrated:
 - company registry,
 - media ingestion,
+- large deterministic demo dataset,
 - article analysis,
 - scoring history,
 - company-linked article view,
