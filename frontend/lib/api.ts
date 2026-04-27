@@ -16,6 +16,11 @@ export interface Company {
   nip?: string | null;
   current_score: number;
   created_at: string;
+  ticker_gpw?: string | null;
+  stock_price?: {
+    price: number;
+    change_percent: number;
+  } | null;
 }
 
 export interface ScorePoint {

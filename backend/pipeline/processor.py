@@ -97,7 +97,24 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
                 category = _pick_category(analysis)
 
                 for company_id in matched_company_ids:
-                    new_score = _compute_company_score(db, scorer, company_id, signal)
+                    company = db.get(Company, company_id)
+                    signal_risk_score = signal.risk_score
+                    
+                    if company and company.industry:
+                        signal_risk_score = scorer.apply_industry_modifier(
+                            signal.risk_score, company.industry, category
+                        )
+                        
+                    company_signal = RiskSignal(
+                        timestamp=signal.timestamp,
+                        risk_score=signal_risk_score,
+                        confidence=signal.confidence,
+                        sentiment=signal.sentiment,
+                        source_weight=signal.source_weight,
+                        article_id=signal.article_id
+                    )
+
+                    new_score = _compute_company_score(db, scorer, company_id, company_signal)
                     
                     # DODANE: Pobierz cenę akcji i zastosuj wpływ na scoring
                     price_change = _get_stock_price_change(company_id)
@@ -109,7 +126,7 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
                             company_id=company_id,
                             article_id=article.id,
                             score=new_score,
-                            risk_score=signal.risk_score,
+                            risk_score=company_signal.risk_score,
                             category=category,
                             recorded_at=_as_db_datetime(signal.timestamp),
                         )

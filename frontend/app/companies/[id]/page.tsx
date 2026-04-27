@@ -208,6 +208,12 @@ export default function CompanyDetailPage() {
                     <span className="font-mono">{company.nip}</span>
                   </span>
                 )}
+                {company.ticker_gpw && (
+                  <span className="text-[var(--ink-muted)] tnum">
+                    <span className="font-semibold text-[var(--ink-2)]">GPW:</span>{' '}
+                    <span className="font-mono">{company.ticker_gpw}</span>
+                  </span>
+                )}
                 <span className="text-[var(--ink-muted)]">
                   <span className="font-semibold text-[var(--ink-2)]">{t.detail.addedOn}</span>{' '}
                   <span className="tnum">{formattedDate}</span>
@@ -246,20 +252,31 @@ export default function CompanyDetailPage() {
                   </p>
                 </div>
 
-                <div className="lg:col-span-3 grid grid-cols-3">
+                <div className={`lg:col-span-3 grid ${company.stock_price ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                   {[
                     { label: t.detail.statsMax, value: max != null ? max.toFixed(0) : '—' },
                     { label: t.detail.statsMin, value: min != null ? min.toFixed(0) : '—' },
                     { label: t.detail.statsCount, value: scoreData.history.length.toString() },
-                  ].map((cell, i) => (
+                    ...(company.stock_price ? [{ 
+                      label: `Akcje (${company.ticker_gpw})`, 
+                      value: `${company.stock_price.price.toFixed(2)} PLN`,
+                      subtext: `${company.stock_price.change_percent > 0 ? '+' : ''}${company.stock_price.change_percent.toFixed(2)}%`,
+                      subtextColor: company.stock_price.change_percent >= 0 ? 'var(--risk-low)' : 'var(--risk-high)'
+                    }] : [])
+                  ].map((cell, i, arr) => (
                     <div
                       key={cell.label}
-                      className={['p-6', i !== 2 ? 'border-r border-[var(--border)]' : ''].join(' ')}
+                      className={['p-6', i !== arr.length - 1 ? 'border-r border-[var(--border)]' : ''].join(' ')}
                     >
                       <p className="eyebrow mb-2">{cell.label}</p>
-                      <p className="text-3xl font-semibold tnum text-[var(--ink)] leading-none">
+                      <p className={`text-2xl lg:text-3xl font-semibold tnum text-[var(--ink)] leading-none ${cell.value.includes('PLN') ? 'text-xl lg:text-2xl' : ''}`}>
                         {cell.value}
                       </p>
+                      {cell.subtext && (
+                        <p className="text-[14px] font-semibold tnum mt-2" style={{ color: cell.subtextColor }}>
+                          {cell.subtext}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

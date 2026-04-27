@@ -154,6 +154,40 @@ class ReputationScorer:
         # Clamp do zakresu [min_score, max_score]
         return _clamp(new_score, self.min_score, self.max_score)
 
+    def apply_industry_modifier(
+        self,
+        base_risk_score: float,
+        industry: str,
+        category: str | None
+    ) -> float:
+        """
+        Modyfikuje risk_score sygnału w zależności od branży i kategorii ryzyka.
+        """
+        if not industry or not category:
+            return base_risk_score
+
+        industry = industry.lower()
+        category = category.lower()
+
+        multiplier = 1.0
+
+        if industry in ("finance", "banking", "payments", "insurance"):
+            if category in ("money_laundering", "sanctions", "regulatory", "fraud"):
+                multiplier = 1.5
+        elif industry in ("energy", "mining", "manufacturing", "construction"):
+            if category in ("corruption", "governance"):
+                multiplier = 1.3
+        elif industry in ("technology", "software"):
+            if category in ("fraud", "governance"):
+                multiplier = 1.2
+        elif industry in ("pharma", "healthcare"):
+            if category in ("regulatory", "corruption", "sanctions"):
+                multiplier = 1.4
+
+        new_score = base_risk_score * multiplier
+        return _clamp(new_score, 0.0, 100.0)
+
+
 
 def signal_from_analysis(
     analysis: Mapping[str, Any],
