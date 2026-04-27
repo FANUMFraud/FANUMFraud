@@ -5,18 +5,22 @@ import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db
 from elastic import index_company, search_companies
 from models import Article, Company, ScoreHistory
+from reports import generate_risk_report
+from sanctions import check_sanctions
 from schemas import (
     ArticleResponse,
     CompanyCreate,
     CompanyResponse,
     CompanyScoreResponse,
     RiskMomentum,
+    SanctionsCheck,
     ScorePoint,
 )
 
@@ -118,6 +122,7 @@ def get_company_score(
 
 
 def _company_response(company: Company, db: Session) -> CompanyResponse:
+    sanctions = check_sanctions(company.name, company.nip)
     return CompanyResponse(
         id=company.id,
         name=company.name,
@@ -126,6 +131,7 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         created_at=company.created_at,
         momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
         momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
+        sanctions=SanctionsCheck(**sanctions),
     )
 
 
@@ -207,6 +213,76 @@ def get_company_articles(
         .order_by(Article.published_at.desc(), Article.id.desc())
         .limit(limit)
         .all()
+    )
+
+
+# GET /companies/{company_id}/export
+
+@router.get("/{company_id}/export")
+def export_company_report(
+    company_id: int,
+    db: Session = Depends(get_db),
+):
+    """Export company risk assessment as PDF report."""
+    company = db.query(Company).get(company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    # Get score history
+    score_resp = get_company_score(company_id, days=90, db=db)
+    
+    # Count articles
+    article_ids_stmt = (
+        select(ScoreHistory.article_id)
+        .where(ScoreHistory.company_id == company_id, ScoreHistory.article_id.is_not(None))
+        .distinct()
+    )
+    articles_count = db.query(Article).filter(Article.id.in_(article_ids_stmt)).count()
+
+    # Get risk level
+    from analyzer import risk_level_from_score
+    risk_level = risk_level_from_score(company.current_score)
+
+    # Get sanctions
+    sanctions_data = check_sanctions(company.name, company.nip)
+
+    # Get top categories
+    top_categories = None
+    if score_resp.history:
+        categories: dict[str, float] = {}
+        for point in score_resp.history:
+            if point.category:
+                categories[point.category] = categories.get(point.category, 0) + point.risk_score
+        top_categories = [
+            {"category": cat, "points": points}
+            for cat, points in sorted(categories.items(), key=lambda x: x[1], reverse=True)
+        ]
+
+    # Generate PDF
+    pdf_bytes = generate_risk_report(
+        company_id=company.id,
+        company_name=company.name,
+        nip=company.nip,
+        current_score=company.current_score,
+        risk_level=risk_level.value,
+        momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
+        momentum_30d=score_resp.momentum_30d.model_dump() if score_resp.momentum_30d else None,
+        top_categories=top_categories,
+        sanctions=sanctions_data,
+        articles_count=articles_count,
+    )
+
+    if pdf_bytes is None:
+        raise HTTPException(
+            status_code=500,
+            detail="PDF generation not available"
+        )
+
+    filename = f"risk_report_{company.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+    return FileResponse(
+        iter([pdf_bytes]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

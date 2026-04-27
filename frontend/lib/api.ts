@@ -10,6 +10,18 @@ export const api = axios.create({
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface SanctionsCheck {
+  is_sanctioned: boolean;
+  lists: Array<{
+    name: string;
+    country: string;
+    match_score: number;
+    entity_id?: string;
+  }>;
+  confidence: number;
+  source: string;
+}
+
 export interface Company {
   id: number;
   name: string;
@@ -18,6 +30,7 @@ export interface Company {
   created_at: string;
   momentum_7d?: RiskMomentum | null;
   momentum_30d?: RiskMomentum | null;
+  sanctions?: SanctionsCheck | null;
 }
 
 export type MomentumLabel =

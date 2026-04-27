@@ -32,6 +32,13 @@ class RiskMomentum(BaseModel):
         return _round_score(value)
 
 
+class SanctionsCheck(BaseModel):
+    is_sanctioned: bool
+    lists: list[dict[str, Any]] = Field(default_factory=list)
+    confidence: float = 0.0
+    source: str = "unknown"
+
+
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -42,6 +49,7 @@ class CompanyResponse(BaseModel):
     created_at: datetime
     momentum_7d: RiskMomentum | None = None
     momentum_30d: RiskMomentum | None = None
+    sanctions: SanctionsCheck | None = None
 
     @field_validator("current_score", mode="before")
     @classmethod

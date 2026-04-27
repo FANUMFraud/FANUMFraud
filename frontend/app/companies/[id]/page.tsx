@@ -255,12 +255,68 @@ export default function CompanyDetailPage() {
                   <span className="font-semibold text-[var(--ink-2)]">{t.detail.addedOn}</span>{' '}
                   <span className="tnum">{formattedDate}</span>
                 </span>
+                <button
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = `/api/companies/${company.id}/export`;
+                    link.download = `risk_report_${company.id}.pdf`;
+                    link.click();
+                  }}
+                  className="ml-auto px-3 py-1 border border-[var(--border)] rounded text-[11px] font-semibold uppercase hover:bg-[var(--surface)] transition"
+                >
+                  📄 {locale === 'pl' ? 'Eksportuj' : 'Export'}
+                </button>
               </div>
             </div>
           </section>
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
             {showAlert && <AlertBanner show={true} scoreDelta={scoreDelta} />}
+
+            {company.sanctions?.is_sanctioned && (
+              <section
+                className="p-6 border border-red-500 bg-red-50 rounded-lg"
+                style={{
+                  borderColor: 'var(--risk-high-rule)',
+                  background: 'var(--risk-high-bg)',
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🚩</span>
+                  <div className="flex-1">
+                    <h3
+                      className="font-semibold text-lg mb-2"
+                      style={{ color: 'var(--risk-high)' }}
+                    >
+                      {locale === 'pl' ? 'FIRMA NA LIŚCIE SANKCJI' : 'ON SANCTIONS LIST'}
+                    </h3>
+                    <p className="text-sm text-[var(--ink-2)] mb-3">
+                      {locale === 'pl'
+                        ? `Ta firma występuje na ${company.sanctions.lists.length} liście(ach) sankcji międzynarodowych.`
+                        : `This company appears on ${company.sanctions.lists.length} international sanctions list(s).`}
+                    </p>
+                    <div className="space-y-2">
+                      {company.sanctions.lists.map((list, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between text-sm p-2 bg-white/50 rounded"
+                        >
+                          <div>
+                            <span className="font-semibold">{list.name}</span>
+                            <span className="text-[var(--ink-muted)] ml-2">
+                              {list.country}
+                            </span>
+                          </div>
+                          <span className="text-xs font-mono text-[var(--ink-2)]">
+                            {(list.match_score * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
 
             <section>
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 border border-[var(--border)] bg-[var(--surface)]">
