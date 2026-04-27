@@ -12,12 +12,15 @@ class Company(Base):
 
     __tablename__ = "companies"
 
-    id: int = Column(Integer, primary_key=True)
-    name: str = Column(String(255), nullable=False, index=True)
-    nip: Optional[str] = Column(String(10), unique=True, nullable=True)
-    aliases: Optional[str] = Column(Text, nullable=True)  # JSON array
-    current_score: float = Column(Float, default=100.0)
-    created_at: datetime = Column(DateTime, server_default=func.now())
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)  
+    nip = Column(String, nullable=True)   
+    isin = Column(String, nullable=True)  
+    ticker_gpw = Column(String, nullable=True)
+    industry = Column(String, nullable=True) 
+    aliases = Column(Text, nullable=True)   
+    current_score = Column(Float, default=100.0)
+    created_at = Column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return (
