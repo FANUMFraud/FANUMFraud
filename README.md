@@ -26,11 +26,12 @@ This project was built for the Transparent Data hackathon challenge:
 - Data layer:
   - PostgreSQL for core data,
   - Elasticsearch for fuzzy company search (with SQL fallback).
-- Demo data:
-  - Docker Compose runs `seed-demo` automatically,
-  - seed creates 12 fictional companies, 1800 demo articles and score history points,
-  - default seed is deterministic and safe to run multiple times,
-  - optional random seed mode can generate a fresh demo variant.
+- Online data:
+  - company registry is synchronized from public online records (GLEIF),
+  - watchlist companies are always bootstrapped (including InPost, ORLEN, zondacrypto, Żabka, Nestle and others),
+  - RSS crawler collects live publications from business/news sources,
+  - startup bootstrap can run ingest + processing immediately,
+  - scheduler keeps both company registry and articles refreshed.
 
 ## Architecture
 
@@ -67,7 +68,7 @@ Main backend flow:
 
 ### 1) Optional env file
 
-Docker Compose has safe local defaults, so `.env` is optional for demo mode.
+Docker Compose has safe local defaults, so `.env` is optional for online mode.
 
 If you want to override settings or add an LLM key, create `.env` in project root based on `.env.example`:
 
@@ -82,24 +83,35 @@ REDIS_URL=redis://redis:6379/0
 ELASTICSEARCH_URL=http://elasticsearch:9200
 
 OPENROUTER_API_KEY=
+
+COMPANY_SYNC_ON_STARTUP=true
+COMPANY_SYNC_LIMIT=300
+COMPANY_SYNC_INTERVAL_HOURS=24
+COMPANY_REGISTRY_COUNTRY=PL
+COMPANY_REGISTRY_CATEGORY=GENERAL
+WATCHLIST_BOOTSTRAP_ON_STARTUP=true
+WATCHLIST_FEEDS_ENABLED=true
+PIPELINE_BOOTSTRAP_ON_STARTUP=true
+INGEST_INTERVAL_MINUTES=15
+PROCESS_INTERVAL_MINUTES=5
 ```
 
 Notes:
 - `OPENROUTER_API_KEY` is optional. Without it, analyzer uses heuristic fallback.
 - Do not commit `.env`.
 
-### 2) Run stack with demo data
+### 2) Run stack with online data bootstrap
 
 ```bash
 docker compose up --build
 ```
 
-The `seed-demo` service runs automatically and populates PostgreSQL with fictional demo data.
+On startup the API:
+- syncs companies from an online registry,
+- ingests fresh RSS articles,
+- processes pending risk-related articles.
 
-Expected default seed size:
-- 12 companies,
-- 1800 articles,
-- score history for demo signals and trend points.
+You can tune limits and intervals using `.env` variables from `.env.example`.
 
 ### 3) Open apps
 
@@ -128,47 +140,13 @@ npm run dev
 
 Frontend expects backend at `http://localhost:8000` by default (`NEXT_PUBLIC_API_URL`).
 
-## Rerun demo seed manually
-
-Stable default dataset:
-
-```bash
-docker compose run --rm seed-demo
-```
-
-Fresh random demo variant:
-
-```bash
-docker compose build seed-demo
-docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
-```
-
-If the database stack is fully stopped, start dependencies first:
-
-```bash
-docker compose up -d postgres elasticsearch
-docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
-```
-
-Reproducible custom variant:
-
-```bash
-docker compose run --rm seed-demo python scripts/seed_demo.py --seed 12345
-```
-
-Larger random dataset:
-
-```bash
-docker compose run --rm seed-demo python scripts/seed_demo.py --seed random --per-company 500
-```
-
-The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts a dataset for the selected seed.
-
 ## Useful manual pipeline commands
 
 From `backend/`:
 
 ```bash
+python -c "from pipeline.company_registry import sync_companies_from_registry; print(sync_companies_from_registry(limit=300))"
+python -c "from pipeline.watchlist import ensure_watchlist_companies; print(ensure_watchlist_companies())"
 python -c "from pipeline.ingest import run_ingest; print(run_ingest())"
 python -c "from pipeline.processor import process_pending_articles; print(process_pending_articles())"
 ```
@@ -181,6 +159,8 @@ Core endpoints:
 - `GET /companies` - list companies (worst first)
 - `GET /companies/search?q=...` - fuzzy company search
 - `POST /companies` - create company
+- `POST /companies/sync/online` - sync registry from online source
+- `POST /companies/watchlist/bootstrap` - force watchlist bootstrap
 - `GET /companies/{company_id}` - company detail
 - `GET /companies/{company_id}/score` - score timeline
 - `GET /companies/{company_id}/articles` - articles linked to company via score history
@@ -216,7 +196,7 @@ npm run build
 Implemented and integrated:
 - company registry,
 - media ingestion,
-- large deterministic demo dataset,
+- online registry synchronization + live RSS pipeline,
 - article analysis,
 - scoring history,
 - company-linked article view,

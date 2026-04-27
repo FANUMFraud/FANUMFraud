@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 from time import mktime
 from typing import Iterable
@@ -8,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from models import Article
+from pipeline.watchlist import watchlist_rss_feeds
 
 log = logging.getLogger(__name__)
 
-RSS_FEEDS: dict[str, str] = {
+BASE_RSS_FEEDS: dict[str, str] = {
     "money.pl": "https://www.money.pl/rss/",
     "businessinsider.com.pl": "https://businessinsider.com.pl/feed",
     "pb.pl": "https://www.pb.pl/rss/",
@@ -19,7 +21,17 @@ RSS_FEEDS: dict[str, str] = {
     "pap.pl": "https://www.pap.pl/rss.xml",
 }
 
+WATCHLIST_FEEDS_ENABLED = os.getenv(
+    "WATCHLIST_FEEDS_ENABLED", "true"
+).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 FEED_TIMEOUT_SECONDS = 15
+WATCHLIST_MAX_ENTRIES_PER_FEED = int(os.getenv("WATCHLIST_MAX_ENTRIES_PER_FEED", "25"))
 
 
 def _entry_published(entry) -> datetime | None:
@@ -38,7 +50,9 @@ def fetch_feed(source: str, url: str) -> list[dict]:
     parsed = feedparser.parse(url, request_headers={"User-Agent": "FanumFraud/1.0"})
 
     if parsed.bozo:
-        log.warning("Feed parse warning source=%s err=%s", source, parsed.bozo_exception)
+        log.warning(
+            "Feed parse warning source=%s err=%s", source, parsed.bozo_exception
+        )
 
     entries: list[dict] = []
     for entry in parsed.entries:
@@ -46,14 +60,21 @@ def fetch_feed(source: str, url: str) -> list[dict]:
         title = getattr(entry, "title", None)
         if not link or not title:
             continue
+        summary = getattr(entry, "summary", None) or getattr(entry, "description", None)
         entries.append(
             {
                 "url": link.strip(),
                 "title": title.strip(),
                 "published_at": _entry_published(entry),
                 "source": source,
+                "summary": str(summary).strip() if summary else None,
             }
         )
+        if (
+            source.startswith("watchlist:")
+            and len(entries) >= WATCHLIST_MAX_ENTRIES_PER_FEED
+        ):
+            break
     log.info("Fetched %d entries source=%s", len(entries), source)
     return entries
 
@@ -79,7 +100,11 @@ def filter_new(db: Session, entries: Iterable[dict]) -> list[dict]:
 
 def crawl_all_feeds(db: Session) -> list[dict]:
     collected: list[dict] = []
-    for source, url in RSS_FEEDS.items():
+    feeds = dict(BASE_RSS_FEEDS)
+    if WATCHLIST_FEEDS_ENABLED:
+        feeds.update(watchlist_rss_feeds())
+
+    for source, url in feeds.items():
         try:
             collected.extend(fetch_feed(source, url))
         except Exception:

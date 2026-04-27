@@ -30,3 +30,9 @@ export function formatMomentumDelta(delta: number): string {
   if (Math.abs(delta) < 0.005) return '0';
   return `${delta > 0 ? '+' : ''}${delta.toFixed(0)}`;
 }
+
+export function formatScore(score: number): string {
+  if (!Number.isFinite(score)) return '—';
+  const rounded = Math.round(score * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+}

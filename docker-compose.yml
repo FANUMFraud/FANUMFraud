@@ -38,27 +38,6 @@ services:
       interval: 10s
       retries: 10
 
-  seed-demo:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: python scripts/seed_demo.py --per-company 150 --seed ${DEMO_SEED:-random}
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
-      POSTGRES_DB: ${POSTGRES_DB:-fanumfraud}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-    restart: "no"
-
   api:
     build:
       context: ./backend
@@ -73,6 +52,17 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      COMPANY_SYNC_ON_STARTUP: ${COMPANY_SYNC_ON_STARTUP:-true}
+      COMPANY_SYNC_LIMIT: ${COMPANY_SYNC_LIMIT:-300}
+      COMPANY_SYNC_INTERVAL_HOURS: ${COMPANY_SYNC_INTERVAL_HOURS:-24}
+      COMPANY_REGISTRY_COUNTRY: ${COMPANY_REGISTRY_COUNTRY:-PL}
+      COMPANY_REGISTRY_CATEGORY: ${COMPANY_REGISTRY_CATEGORY:-GENERAL}
+      WATCHLIST_BOOTSTRAP_ON_STARTUP: ${WATCHLIST_BOOTSTRAP_ON_STARTUP:-true}
+      WATCHLIST_FEEDS_ENABLED: ${WATCHLIST_FEEDS_ENABLED:-true}
+      PIPELINE_BOOTSTRAP_ON_STARTUP: ${PIPELINE_BOOTSTRAP_ON_STARTUP:-true}
+      INGEST_INTERVAL_MINUTES: ${INGEST_INTERVAL_MINUTES:-15}
+      PROCESS_INTERVAL_MINUTES: ${PROCESS_INTERVAL_MINUTES:-5}
+      PROCESS_BOOTSTRAP_BATCH_SIZE: ${PROCESS_BOOTSTRAP_BATCH_SIZE:-120}
     ports:
       - "8000:8000"
     depends_on:
@@ -82,8 +72,6 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
-      seed-demo:
-        condition: service_completed_successfully
 
 volumes:
   postgres_data:

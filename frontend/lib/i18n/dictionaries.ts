@@ -116,7 +116,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
         'Nie udało się połączyć z API. Sprawdź, czy backend jest dostępny pod localhost:8000.',
       errorRetry: 'Spróbuj ponownie',
       emptyTitle: 'Brak firm w bazie',
-      emptySubtitle: 'Dodaj pierwszą firmę, aby zacząć monitoring.',
+      emptySubtitle: 'Trwa synchronizacja rejestru online. Odśwież widok za chwilę.',
     },
     search: {
       placeholder: 'Szukaj firmy po nazwie lub NIP…',
@@ -199,7 +199,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
         'Could not reach the API. Make sure the backend is running on localhost:8000.',
       errorRetry: 'Retry',
       emptyTitle: 'No companies yet',
-      emptySubtitle: 'Add your first company to start monitoring.',
+      emptySubtitle: 'Online registry sync is in progress. Refresh in a moment.',
     },
     search: {
       placeholder: 'Search by name or VAT number…',

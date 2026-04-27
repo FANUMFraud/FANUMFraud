@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { Company } from '@/lib/api';
-import { formatMomentumDelta, getRiskLevel, momentumSymbol, momentumTone } from '@/lib/risk';
+import { formatMomentumDelta, formatScore, getRiskLevel, momentumSymbol, momentumTone } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
 interface Props {
@@ -84,7 +84,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
           <div>
             <p className="eyebrow mb-1">{t.card.score}</p>
             <p className={`text-[42px] font-semibold tnum tracking-tight leading-none ${tone.text}`}>
-              {company.current_score}
+              {formatScore(company.current_score)}
               <span className="text-base font-medium text-[var(--ink-faint)] ml-1">
                 {t.card.scoreOutOf}
               </span>
@@ -105,7 +105,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
         <div className="h-1 w-full bg-[var(--paper-2)] border-t border-[var(--rule)]">
           <div
             className={`h-full ${tone.bar} transition-[width] duration-700 ease-out`}
-            style={{ width: `${company.current_score}%` }}
+            style={{ width: `${Math.max(0, Math.min(100, company.current_score))}%` }}
           />
         </div>
       </article>

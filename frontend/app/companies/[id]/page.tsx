@@ -16,7 +16,7 @@ import AlertBanner from '@/components/AlertBanner';
 import Header from '@/components/Header';
 import LocaleFade from '@/components/LocaleFade';
 import Link from 'next/link';
-import { formatMomentumDelta, getRiskLevel, momentumSymbol, momentumTone, scoreDrop } from '@/lib/risk';
+import { formatMomentumDelta, formatScore, getRiskLevel, momentumSymbol, momentumTone, scoreDrop } from '@/lib/risk';
 import { CATEGORY_ORDER, normalizeCategory, type CanonicalCategory } from '@/lib/categories';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
@@ -332,7 +332,7 @@ export default function CompanyDetailPage() {
                     className="text-[64px] font-semibold tnum leading-none tracking-tight"
                     style={{ color: riskColor }}
                   >
-                    {company.current_score}
+                    {formatScore(company.current_score)}
                     <span className="text-2xl font-medium text-[var(--ink-faint)] ml-1">
                       {t.card.scoreOutOf}
                     </span>
@@ -340,7 +340,7 @@ export default function CompanyDetailPage() {
                   <div className="h-1.5 w-full bg-[var(--paper-2)] border border-[var(--rule)] mt-4">
                     <div
                       className="h-full transition-[width] duration-700 ease-out"
-                      style={{ width: `${company.current_score}%`, background: riskColor }}
+                      style={{ width: `${Math.max(0, Math.min(100, company.current_score))}%`, background: riskColor }}
                     />
                   </div>
                   <p className="text-[12px] text-[var(--ink-2)] mt-3">

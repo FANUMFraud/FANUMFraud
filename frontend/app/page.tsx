@@ -88,7 +88,7 @@ export default function DashboardPage() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
               <div className="max-w-3xl">
                 <p className="eyebrow mb-3">
-                  {locale === 'pl' ? 'Rejestr publiczny · Wersja robocza' : 'Public registry · Working draft'}
+                  {locale === 'pl' ? 'Rejestr publiczny · Dane online' : 'Public registry · Live data'}
                 </p>
                 <h1 className="text-3xl sm:text-[40px] font-semibold tracking-tight text-[var(--ink)] leading-[1.1]">
                   {t.dashboard.title}{' '}

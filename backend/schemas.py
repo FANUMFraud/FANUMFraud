@@ -93,6 +93,21 @@ class CompanyScoreResponse(BaseModel):
         return _round_score(value)
 
 
+class CompanySyncResponse(BaseModel):
+    fetched: int
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+
+
+class WatchlistBootstrapResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+
+
 # Article
 
 

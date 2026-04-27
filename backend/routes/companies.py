@@ -5,24 +5,28 @@ import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import FileResponse
-from sqlalchemy import select
+from fastapi.responses import Response
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from database import get_db
 from elastic import index_company, search_companies
 from models import Article, Company, ScoreHistory
+from pipeline.company_registry import sync_companies_from_registry
+from pipeline.watchlist import ensure_watchlist_companies
 from reports import generate_risk_report
 from sanctions import check_sanctions
 from schemas import (
     ArticleResponse,
     CompanyCreate,
     CompanyResponse,
+    CompanySyncResponse,
     CompanyScoreResponse,
     RiskMomentum,
     SanctionsCheck,
     ScorePoint,
     StockPriceData,
+    WatchlistBootstrapResponse,
 )
 from stock_fetcher import StooqPriceFetcher
 
@@ -32,16 +36,20 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 
 # GET /companies
 
+
 @router.get("", response_model=list[CompanyResponse])
 def list_companies(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    include_empty: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    # Return all companies ordered by current_score ascending (worst first)
+    query = db.query(Company)
+    if not include_empty:
+        has_history = exists().where(ScoreHistory.company_id == Company.id)
+        query = query.filter(has_history)
     companies = (
-        db.query(Company)
-        .order_by(Company.current_score.asc())
+        query.order_by(Company.current_score.asc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -50,6 +58,7 @@ def list_companies(
 
 
 # GET /companies/search
+
 
 @router.get("/search")
 def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
@@ -63,12 +72,7 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     except Exception:
         logger.warning("Elasticsearch unavailable, falling back to SQL LIKE")
         pattern = f"%{q}%"
-        rows = (
-            db.query(Company)
-            .filter(Company.name.ilike(pattern))
-            .limit(20)
-            .all()
-        )
+        rows = db.query(Company).filter(Company.name.ilike(pattern)).limit(20).all()
         return [
             {
                 "id": r.id,
@@ -80,7 +84,34 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
         ]
 
 
+@router.post("/sync/online", response_model=CompanySyncResponse)
+def sync_online_companies(limit: int = Query(300, ge=50, le=2000)):
+    """
+    Sync company registry from online source (GLEIF).
+
+    This endpoint is safe to call repeatedly; existing entities are matched by
+    LEI alias and fuzzy name.
+    """
+    try:
+        return CompanySyncResponse.model_validate(
+            sync_companies_from_registry(limit=limit)
+        )
+    except Exception:
+        logger.exception("Online company sync failed")
+        raise HTTPException(status_code=502, detail="Online company sync failed")
+
+
+@router.post("/watchlist/bootstrap", response_model=WatchlistBootstrapResponse)
+def bootstrap_watchlist_companies():
+    try:
+        return WatchlistBootstrapResponse.model_validate(ensure_watchlist_companies())
+    except Exception:
+        logger.exception("Watchlist bootstrap failed")
+        raise HTTPException(status_code=502, detail="Watchlist bootstrap failed")
+
+
 # GET /companies/{company_id}
+
 
 @router.get("/{company_id}", response_model=CompanyResponse)
 def get_company(company_id: int, db: Session = Depends(get_db)):
@@ -105,6 +136,7 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
 
 
 # GET /companies/{company_id}/score
+
 
 @router.get("/{company_id}/score", response_model=CompanyScoreResponse)
 def get_company_score(
@@ -202,6 +234,7 @@ def _momentum_label(delta: float) -> str:
 
 # GET /companies/{company_id}/articles
 
+
 @router.get("/{company_id}/articles", response_model=list[ArticleResponse])
 def get_company_articles(
     company_id: int,
@@ -296,14 +329,15 @@ def export_company_report(
         )
 
     filename = f"risk_report_{company.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
-    return FileResponse(
-        iter([pdf_bytes]),
+    return Response(
+        content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
 # POST /companies
+
 
 @router.post("", response_model=CompanyResponse, status_code=201)
 def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
