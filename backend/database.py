@@ -16,8 +16,8 @@ load_dotenv()
 
 # Konstrukcja URL bazy danych
 DATABASE_URL: str = (
-    f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
-    f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
+    f"postgresql://{os.getenv('POSTGRES_USER', 'fanumfraud')}:{os.getenv('POSTGRES_PASSWORD', 'fanumfraud')}"
+    f"@{os.getenv('POSTGRES_HOST', 'localhost')}:{os.getenv('POSTGRES_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'fanumfraud')}"
 )
 
 # Tworzenie engine i SessionLocal

@@ -21,6 +21,7 @@ from analyzer import ArticleAnalyzer, ArticleInput, ArticleRiskAnalysis
 from database import SessionLocal
 from models import Article, Company, ScoreHistory
 from scorer import ReputationScorer, RiskSignal
+from pipeline.watchlist import WATCHLIST_COMPANIES
 
 log = logging.getLogger(__name__)
 
@@ -144,7 +145,9 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
         for article in pending_articles:
             try:
                 analysis = _analyze_article(article, candidate_companies)
-                matched_company_ids = _resolve_company_ids(article, analysis, alias_index, exact_lookup)
+                matched_company_ids = _resolve_company_ids(
+                    article, analysis, alias_index, exact_lookup
+                )
 
                 if not matched_company_ids:
                     article.processed = True
@@ -189,7 +192,9 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
     return stats
 
 
-def _analyze_article(article: Article, candidate_companies: list[str]) -> ArticleRiskAnalysis:
+def _analyze_article(
+    article: Article, candidate_companies: list[str]
+) -> ArticleRiskAnalysis:
     payload = ArticleInput(
         title=article.title or "",
         content=article.content or "",
@@ -203,9 +208,13 @@ def _analyze_article(article: Article, candidate_companies: list[str]) -> Articl
 
 def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal:
     timestamp = article.published_at or datetime.now(UTC)
-    sentiment = analysis.sentiment.value if hasattr(analysis.sentiment, "value") else str(analysis.sentiment)
+    sentiment = (
+        analysis.sentiment.value
+        if hasattr(analysis.sentiment, "value")
+        else str(analysis.sentiment)
+    )
     source_weight, source_tier = _source_credibility(article.source)
-    
+
     # Extract denial_recency from events if present
     metadata = {
         "source": article.source,
@@ -218,14 +227,18 @@ def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal
             metadata["certainty"] = first_event.certainty.value
         else:
             metadata["certainty"] = str(first_event.certainty)
-        
+
         # Calculate denial recency (days since denial) if denial_date exists
         if first_event.denial_date:
             now = datetime.now(UTC)
-            denial_date = first_event.denial_date if first_event.denial_date.tzinfo else first_event.denial_date.replace(tzinfo=UTC)
+            denial_date = (
+                first_event.denial_date
+                if first_event.denial_date.tzinfo
+                else first_event.denial_date.replace(tzinfo=UTC)
+            )
             denial_days = (now - denial_date).total_seconds() / 86_400.0
             metadata["denial_recency_days"] = max(0.0, denial_days)  # No negative days
-    
+
     return RiskSignal(
         timestamp=timestamp,
         risk_score=analysis.risk_score,
@@ -257,15 +270,15 @@ def _calculate_burst_multiplier(
 ) -> float:
     """
     Detect if this article is part of a media burst (many articles in short time).
-    
+
     Burst multiplier logic:
     - 1-5 articles in 7 days: 1.0 - 1.2 progressive multiplier
     - 5+ articles: 1.2 (capped)
-    
+
     This detects coordinated media campaigns or smear campaigns.
     """
     cutoff_date = article_published_at - timedelta(days=burst_window_days)
-    
+
     # Count articles for this company in the burst window
     recent_articles_count = (
         db.query(ScoreHistory)
@@ -275,14 +288,16 @@ def _calculate_burst_multiplier(
         )
         .count()
     )
-    
+
     if recent_articles_count < burst_threshold:
         # No burst: linear scale from 1.0 to 1.2
-        multiplier = 1.0 + (burst_multiplier_max - 1.0) * (recent_articles_count / burst_threshold)
+        multiplier = 1.0 + (burst_multiplier_max - 1.0) * (
+            recent_articles_count / burst_threshold
+        )
     else:
         # Burst detected: use maximum multiplier
         multiplier = burst_multiplier_max
-    
+
     return multiplier
 
 
@@ -305,9 +320,11 @@ def _compute_company_score(
     )
 
     historical_signals = [_signal_from_history(row) for row in rows]
-    point = scorer.point_at([*historical_signals, new_signal], as_of=new_signal.timestamp)
+    point = scorer.point_at(
+        [*historical_signals, new_signal], as_of=new_signal.timestamp
+    )
     base_score = point.score
-    
+
     # Apply burst multiplier: increases score impact if many articles in short time
     if article_published_at:
         burst_mult = _calculate_burst_multiplier(db, company_id, article_published_at)
@@ -315,7 +332,7 @@ def _compute_company_score(
         # Example: burst_mult=1.2 means 20% increase in risk, so reduce score
         adjusted_score = 100.0 - ((100.0 - base_score) * burst_mult)
         return _clamp(adjusted_score, 0.0, 100.0)
-    
+
     return base_score
 
 
@@ -383,7 +400,9 @@ def _match_company_id(
     return None
 
 
-def _match_from_article_text(article_text: str, alias_index: list[CompanyAlias]) -> set[int]:
+def _match_from_article_text(
+    article_text: str, alias_index: list[CompanyAlias]
+) -> set[int]:
     normalized_text = _normalize_name(article_text)
     if not normalized_text:
         return set()
@@ -399,19 +418,41 @@ def _match_from_article_text(article_text: str, alias_index: list[CompanyAlias])
     return found
 
 
-def _build_candidate_companies(companies: Iterable[Company], limit: int = 300) -> list[str]:
+def _build_candidate_companies(
+    companies: Iterable[Company], limit: int = 300
+) -> list[str]:
     values: list[str] = []
     seen: set[str] = set()
 
-    for company in companies:
-        for raw in _iter_company_names(company):
-            normalized = _normalize_name(raw)
-            if not normalized or normalized in seen:
-                continue
-            seen.add(normalized)
-            values.append(raw)
-            if len(values) >= limit:
-                return values
+    watchlist_name_keys = {
+        _normalize_name(item.name)
+        for item in WATCHLIST_COMPANIES
+        if _normalize_name(item.name)
+    }
+
+    company_list = sorted(
+        list(companies),
+        key=lambda company: (
+            0 if _normalize_name(company.name or "") in watchlist_name_keys else 1
+        ),
+    )
+    primary_names: list[str] = []
+    secondary_aliases: list[str] = []
+
+    for company in company_list:
+        if company.name and company.name.strip():
+            primary_names.append(company.name.strip())
+        aliases = _load_aliases(company.aliases)
+        secondary_aliases.extend(alias for alias in aliases if alias.strip())
+
+    for raw in [*primary_names, *secondary_aliases]:
+        normalized = _normalize_name(raw)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        values.append(raw)
+        if len(values) >= limit:
+            return values
 
     return values
 
@@ -472,7 +513,9 @@ def _load_aliases(raw_aliases: str | None) -> list[str]:
 
 def _normalize_name(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", str(value))
-    ascii_value = "".join(char for char in normalized if not unicodedata.combining(char)).lower()
+    ascii_value = "".join(
+        char for char in normalized if not unicodedata.combining(char)
+    ).lower()
     ascii_value = re.sub(r"[^a-z0-9\s\.\-&]", " ", ascii_value)
     return re.sub(r"\s+", " ", ascii_value).strip()
 

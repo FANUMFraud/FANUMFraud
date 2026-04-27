@@ -2,6 +2,7 @@
 
 import logging
 import math
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -24,6 +25,7 @@ article_analyzer = ArticleAnalyzer()
 
 
 # Algorithm request/response models
+
 
 class ScoreSignalRequest(BaseModel):
     timestamp: datetime
@@ -75,45 +77,105 @@ class AnomalyResponse(BaseModel):
 
 # App setup
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initialising database tables...")
     init_db()
+    scheduler = None
 
     try:
         from elastic import init_index
+
         init_index()
     except Exception:
-        logger.warning("Elasticsearch unavailable at startup -- search will use SQL fallback")
+        logger.warning(
+            "Elasticsearch unavailable at startup -- search will use SQL fallback"
+        )
 
-    # Start scheduler
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
+        from pipeline.company_registry import sync_companies_from_registry
         from pipeline.ingest import run_ingest
         from pipeline.processor import process_pending_articles
+        from pipeline.watchlist import ensure_watchlist_companies
 
-        scheduler = BackgroundScheduler()
-        
-        # RSS ingestion co 15 minut
-        scheduler.add_job(run_ingest, "interval", minutes=15, id="ingest-rss", replace_existing=True)
-        logger.info("Scheduled: run_ingest co 15 minut")
-        
-        # Przetwarzanie artykułów co 5 minut
-        scheduler.add_job(
-            process_pending_articles, 
-            "interval", 
-            minutes=5, 
-            id="process-articles",
-            replace_existing=True
+        company_sync_limit = int(os.getenv("COMPANY_SYNC_LIMIT", "300"))
+        ingest_interval_minutes = int(os.getenv("INGEST_INTERVAL_MINUTES", "15"))
+        process_interval_minutes = int(os.getenv("PROCESS_INTERVAL_MINUTES", "5"))
+        company_sync_interval_hours = int(
+            os.getenv("COMPANY_SYNC_INTERVAL_HOURS", "24")
         )
-        logger.info("Scheduled: process_pending_articles co 5 minut")
-        
+        bootstrap_batch_size = int(os.getenv("PROCESS_BOOTSTRAP_BATCH_SIZE", "120"))
+
+        if _env_flag("COMPANY_SYNC_ON_STARTUP", True):
+            try:
+                stats = sync_companies_from_registry(limit=company_sync_limit)
+                logger.info("Startup company registry sync: %s", stats)
+            except Exception:
+                logger.exception("Startup company registry sync failed")
+
+        if _env_flag("WATCHLIST_BOOTSTRAP_ON_STARTUP", True):
+            try:
+                watchlist_stats = ensure_watchlist_companies()
+                logger.info("Startup watchlist bootstrap: %s", watchlist_stats)
+            except Exception:
+                logger.exception("Startup watchlist bootstrap failed")
+
+        if _env_flag("PIPELINE_BOOTSTRAP_ON_STARTUP", True):
+            try:
+                ingest_stats = run_ingest()
+                process_stats = process_pending_articles(
+                    batch_size=bootstrap_batch_size
+                )
+                logger.info("Startup ingest stats: %s", ingest_stats)
+                logger.info("Startup processing stats: %s", process_stats)
+            except Exception:
+                logger.exception("Startup ingest/process bootstrap failed")
+
+        scheduler = BackgroundScheduler(timezone="Europe/Warsaw")
+        scheduler.add_job(
+            run_ingest,
+            "interval",
+            minutes=ingest_interval_minutes,
+            id="ingest-rss",
+            replace_existing=True,
+        )
+        logger.info("Scheduled run_ingest every %d min", ingest_interval_minutes)
+
+        scheduler.add_job(
+            process_pending_articles,
+            "interval",
+            minutes=process_interval_minutes,
+            id="process-articles",
+            replace_existing=True,
+        )
+        logger.info(
+            "Scheduled process_pending_articles every %d min", process_interval_minutes
+        )
+
+        if company_sync_interval_hours > 0:
+            scheduler.add_job(
+                sync_companies_from_registry,
+                "interval",
+                hours=company_sync_interval_hours,
+                id="sync-companies",
+                kwargs={"limit": company_sync_limit},
+                replace_existing=True,
+            )
+            logger.info(
+                "Scheduled company registry sync every %d h",
+                company_sync_interval_hours,
+            )
+
         scheduler.start()
-        logger.info("Scheduler uruchomiony")
-    except Exception as e:
-        logger.warning(f"Scheduler nie uruchomiony: {e}")
+        logger.info("Scheduler started")
+    except Exception as exc:
+        logger.warning("Scheduler not started: %s", exc)
 
     yield
+    if scheduler is not None and scheduler.running:
+        scheduler.shutdown(wait=False)
     logger.info("Shutting down.")
 
 
@@ -141,12 +203,14 @@ app.include_router(articles_router)
 
 # Health
 
+
 @app.get("/", tags=["health"])
 def root():
     return {"status": "ok", "service": "FANUMFraud"}
 
 
 # Algorithm endpoints
+
 
 @app.post("/algorithm/analyze", response_model=ArticleRiskAnalysis)
 def analyze_article(article: ArticleInput):
@@ -185,7 +249,9 @@ def detect_anomaly(payload: AnomalyRequest):
         min_abs_jump=payload.min_abs_jump,
     )
     observations = [
-        ScoreObservation(timestamp=item.timestamp, score=item.score, article_id=item.article_id)
+        ScoreObservation(
+            timestamp=item.timestamp, score=item.score, article_id=item.article_id
+        )
         for item in payload.observations
     ]
     anomalies = detector.detect(observations)
@@ -203,6 +269,13 @@ def detect_anomaly(payload: AnomalyRequest):
         )
         for item in anomalies
     ]
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _safe_robust_z(value: float) -> float:

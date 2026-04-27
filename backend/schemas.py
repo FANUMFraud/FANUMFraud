@@ -40,6 +40,21 @@ class CompanyScoreResponse(BaseModel):
     history: list[ScorePoint]
 
 
+class CompanySyncResponse(BaseModel):
+    fetched: int
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+
+
+class WatchlistBootstrapResponse(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    errors: int
+
+
 # Article
 
 
