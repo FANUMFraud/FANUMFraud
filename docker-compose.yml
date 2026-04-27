@@ -73,6 +73,39 @@ services:
       elasticsearch:
         condition: service_healthy
 
+  seed-demo:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      python scripts/seed_demo.py
+      --seed ${DEMO_SEED:-20260427}
+      --per-company ${DEMO_ARTICLES_PER_COMPANY:-150}
+      --days ${DEMO_DAYS:-270}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
+      POSTGRES_DB: ${POSTGRES_DB:-fanumfraud}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      ELASTICSEARCH_URL: ${ELASTICSEARCH_URL:-http://elasticsearch:9200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
   es_data:

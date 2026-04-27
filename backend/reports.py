@@ -26,16 +26,24 @@ try:
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 except ImportError:
     # Fallback: if reportlab not available, provide mock
+    colors = None
+    A4 = None
+    getSampleStyleSheet = None
+    ParagraphStyle = None
+    inch = 1
+    TA_LEFT = 0
     SimpleDocTemplate = None
     Table = None
+    TableStyle = None
     Paragraph = None
+    Spacer = None
 
 log = logging.getLogger(__name__)
 
-HEADER_COLOR = colors.HexColor("#1a1a1a")
-RISK_HIGH_COLOR = colors.HexColor("#dc2626")
-RISK_MEDIUM_COLOR = colors.HexColor("#f59e0b")
-RISK_LOW_COLOR = colors.HexColor("#10b981")
+HEADER_COLOR = colors.HexColor("#1a1a1a") if colors is not None else None
+RISK_HIGH_COLOR = colors.HexColor("#dc2626") if colors is not None else None
+RISK_MEDIUM_COLOR = colors.HexColor("#f59e0b") if colors is not None else None
+RISK_LOW_COLOR = colors.HexColor("#10b981") if colors is not None else None
 
 
 def generate_risk_report(

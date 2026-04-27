@@ -65,9 +65,12 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
               <h3 className="text-[15px] font-semibold text-[var(--ink)] leading-snug truncate">
                 {company.name}
               </h3>
-              <p className="text-[11px] text-[var(--ink-muted)] font-mono mt-1 tnum">
-                {t.card.nip}: {company.nip ?? '—'}
-              </p>
+              <div className="text-[11px] text-[var(--ink-muted)] font-mono mt-1 tnum flex flex-wrap gap-x-3 gap-y-1">
+                <span>{t.card.nip}: {company.nip ?? '—'}</span>
+                {company.ticker_gpw && (
+                  <span className="text-[var(--ink-2)]">GPW: {company.ticker_gpw}</span>
+                )}
+              </div>
             </div>
           </div>
           <span

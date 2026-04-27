@@ -18,6 +18,9 @@ DEMO_STOCK_DATA = {
     "MCON": {"price": 156.75, "change": -0.8, "volume": 340000},
     "ACM": {"price": 92.10, "change": 3.2, "volume": 680000},
     "SCP": {"price": 78.90, "change": -1.1, "volume": 410000},
+    "QRG": {"price": 44.20, "change": 0.9, "volume": 290000},
+    "AMN": {"price": 31.85, "change": -3.7, "volume": 740000},
+    "BPY": {"price": 18.40, "change": -2.6, "volume": 980000},
 }
 
 

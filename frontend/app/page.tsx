@@ -11,6 +11,10 @@ import { useI18n } from '@/lib/i18n/I18nProvider';
 
 type SortMode = 'risk_desc' | 'risk_asc' | 'trend_desc' | 'name';
 
+function isDemoCompany(company: Company): boolean {
+  return Boolean(company.nip?.startsWith('10100000'));
+}
+
 export default function DashboardPage() {
   const { t, locale, formatTime, formatDate } = useI18n();
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -45,6 +49,8 @@ export default function DashboardPage() {
     if (sort === 'trend_desc') return (a.momentum_7d?.delta ?? 0) - (b.momentum_7d?.delta ?? 0);
     return a.name.localeCompare(b.name, locale === 'pl' ? 'pl' : 'en');
   });
+  const onlineCompanies = sorted.filter((company) => !isDemoCompany(company));
+  const demoCompanies = sorted.filter(isDemoCompany);
 
   const highRisk = companies.filter((c) => getRiskLevel(c.current_score) === 'high').length;
   const medRisk = companies.filter((c) => getRiskLevel(c.current_score) === 'medium').length;
@@ -212,14 +218,46 @@ export default function DashboardPage() {
               )}
 
               {!loading && !error && sorted.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {sorted.map((company, i) => (
-                    <CompanyCard
-                      key={company.id}
-                      company={company}
-                      animationDelay={Math.min(i * 35, 280)}
-                    />
-                  ))}
+                <div className="space-y-10">
+                  {onlineCompanies.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <p className="eyebrow">
+                          {locale === 'pl' ? 'Dane internetowe' : 'Online data'} · {onlineCompanies.length}
+                        </p>
+                        <hr className="hr-rule flex-1" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {onlineCompanies.map((company, i) => (
+                          <CompanyCard
+                            key={company.id}
+                            company={company}
+                            animationDelay={Math.min(i * 35, 280)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {demoCompanies.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <p className="eyebrow">
+                          {locale === 'pl' ? 'Dane demo' : 'Demo data'} · {demoCompanies.length}
+                        </p>
+                        <hr className="hr-rule flex-1" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {demoCompanies.map((company, i) => (
+                          <CompanyCard
+                            key={company.id}
+                            company={company}
+                            animationDelay={Math.min(i * 35, 280)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
