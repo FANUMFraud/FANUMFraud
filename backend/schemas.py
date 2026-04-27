@@ -12,6 +12,14 @@ class CompanyCreate(BaseModel):
     aliases: list[str] = Field(default_factory=list)
 
 
+class StockPriceData(BaseModel):
+    """Dane giełdowe dla firmy"""
+    model_config = ConfigDict(from_attributes=True)
+    
+    price: float
+    change_percent: float
+
+
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -20,6 +28,8 @@ class CompanyResponse(BaseModel):
     nip: str | None
     current_score: float
     created_at: datetime
+    ticker_gpw: str | None = None
+    stock_price: StockPriceData | None = None
 
 
 class ScorePoint(BaseModel):

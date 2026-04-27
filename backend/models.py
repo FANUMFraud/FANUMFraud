@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey, Boolean, UniqueConstraint
 from sqlalchemy.sql import func
 
 from database import Base
@@ -47,3 +47,17 @@ class ScoreHistory(Base):
     risk_score: float = Column(Float, nullable=False)
     category: Optional[str] = Column(String(50), nullable=True)
     recorded_at: datetime = Column(DateTime, server_default=func.now(), index=True)
+
+
+# Historia cen akcji na giełdzie
+class StockPrice(Base):
+    __tablename__ = "stock_prices"
+
+    id: int = Column(Integer, primary_key=True)
+    company_id: int = Column(Integer, ForeignKey("companies.id"), nullable=False, index=True)
+    ticker: str = Column(String(20), nullable=False)
+    price: float = Column(Float, nullable=False)
+    price_change_percent: float = Column(Float, nullable=False)
+    recorded_at: datetime = Column(DateTime, server_default=func.now(), index=True)
+
+    __table_args__ = (UniqueConstraint('company_id', 'recorded_at'),)

@@ -17,7 +17,9 @@ from schemas import (
     CompanyResponse,
     CompanyScoreResponse,
     ScorePoint,
+    StockPriceData,
 )
+from stock_fetcher import StooqPriceFetcher
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/companies", tags=["companies"])
@@ -79,7 +81,24 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
     company = db.query(Company).get(company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    return company
+    
+    # DODANE: Pobierz aktualną cenę akcji
+    stock_price = None
+    if company.ticker_gpw:
+        try:
+            stock_data = StooqPriceFetcher.fetch_current_price(company.ticker_gpw)
+            if stock_data:
+                stock_price = StockPriceData(
+                    price=stock_data['price'],
+                    change_percent=stock_data['price_change']
+                )
+        except Exception as e:
+            logger.warning(f"Failed to fetch stock price for {company.ticker_gpw}: {e}")
+    
+    # Konwertuj kompanię do response modelu
+    response = CompanyResponse.model_validate(company)
+    response.stock_price = stock_price
+    return response
 
 
 # GET /companies/{company_id}/score
