@@ -1,25 +1,26 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { searchCompanies, type Company } from '@/lib/api';
 import Link from 'next/link';
+import { searchCompanies, type Company } from '@/lib/api';
 import { getRiskLevel } from '@/lib/risk';
+import { useI18n } from '@/lib/i18n/I18nProvider';
 
-const getRiskColor = (score: number) => {
-  const riskLevel = getRiskLevel(score);
-  if (riskLevel === 'high') return 'text-red-400';
-  if (riskLevel === 'medium') return 'text-yellow-400';
-  return 'text-emerald-400';
+const riskTextClass = (score: number) => {
+  const r = getRiskLevel(score);
+  if (r === 'high') return 'text-[var(--risk-high)]';
+  if (r === 'medium') return 'text-[var(--risk-medium)]';
+  return 'text-[var(--risk-low)]';
 };
 
 export default function SearchBar() {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -30,14 +31,12 @@ export default function SearchBar() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Debounced search
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
       setIsOpen(false);
       return;
     }
-
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
@@ -49,19 +48,17 @@ export default function SearchBar() {
       } finally {
         setLoading(false);
       }
-    }, 300);
-
+    }, 280);
     return () => clearTimeout(timer);
   }, [query]);
 
   return (
     <div ref={containerRef} className="relative w-full max-w-2xl mx-auto z-40">
-      {/* Input */}
       <div className="relative flex items-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          className="absolute left-5 w-5 h-5 text-gray-500 pointer-events-none"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          className="absolute left-4 w-[18px] h-[18px] text-[var(--ink-muted)] pointer-events-none"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -70,52 +67,57 @@ export default function SearchBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Szukaj firmy po nazwie lub NIP…"
-          className="
-            w-full py-4 pl-14 pr-12 text-base
-            bg-[#0f1521] border border-white/10 rounded-2xl
-            text-white placeholder:text-gray-600
-            focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40
-            transition-all duration-200
-          "
+          placeholder={t.search.placeholder}
+          aria-label={t.search.placeholder}
+          className="doc-input pl-12 pr-14"
         />
 
         {loading && (
-          <div className="absolute right-5">
-            <div className="w-4 h-4 border-2 border-gray-500 border-t-blue-400 rounded-full animate-spin" />
+          <div className="absolute right-4">
+            <div className="w-3.5 h-3.5 border-2 border-[var(--border)] border-t-[var(--ink)] rounded-full animate-spin" />
           </div>
+        )}
+
+        {!loading && query.trim().length > 0 && query.trim().length < 2 && (
+          <span className="absolute right-4 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-muted)] pointer-events-none">
+            {t.search.hint}
+          </span>
         )}
       </div>
 
-      {/* Dropdown */}
       {isOpen && (
-        <div className="absolute mt-2 w-full bg-[#0f1521] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+        <div
+          className="absolute mt-[-1px] w-full bg-[var(--surface)] border border-[var(--ink)] border-t-0"
+          style={{ borderRadius: 0 }}
+        >
           {results.length > 0 ? (
             results.map((company, i) => (
               <Link
                 key={company.id}
                 href={`/companies/${company.id}`}
                 onClick={() => { setIsOpen(false); setQuery(''); }}
-                className={`
-                  flex items-center justify-between px-5 py-4
-                  hover:bg-white/5 transition-colors
-                  ${i !== results.length - 1 ? 'border-b border-white/5' : ''}
-                `}
+                className={[
+                  'no-underline flex items-center justify-between px-4 py-3',
+                  'hover:bg-[var(--paper-2)] transition-colors',
+                  i !== results.length - 1 ? 'border-b border-[var(--rule)]' : '',
+                ].join(' ')}
               >
-                <div>
-                  <p className="font-semibold text-white">{company.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-[var(--ink)] text-sm truncate">{company.name}</p>
                   {company.nip && (
-                    <p className="text-xs text-gray-500 font-mono mt-0.5">NIP: {company.nip}</p>
+                    <p className="text-[11px] text-[var(--ink-muted)] font-mono mt-0.5 tnum">
+                      {t.card.nip}: {company.nip}
+                    </p>
                   )}
                 </div>
-                <span className={`font-bold text-lg tabular-nums ${getRiskColor(company.current_score)}`}>
+                <span className={`font-semibold text-base tnum ${riskTextClass(company.current_score)}`}>
                   {company.current_score}
                 </span>
               </Link>
             ))
           ) : (
-            <div className="px-5 py-6 text-center text-gray-500 text-sm">
-              Nie znaleziono firm pasujących do &quot;{query}&quot;
+            <div className="px-4 py-5 text-center text-[var(--ink-muted)] text-sm">
+              {t.search.noResults(query)}
             </div>
           )}
         </div>

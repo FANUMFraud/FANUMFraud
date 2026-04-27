@@ -1,58 +1,383 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Light theme (default) — institutional / official-document.
+   Warm paper background, deep navy ink, crimson used sparingly.
+   ──────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #080b12;
-  --surface: #0f1521;
-  --surface-2: #161e2e;
-  --border: rgba(255,255,255,0.07);
-  --foreground: #e8eaf0;
-  --muted: #6b7280;
-  --accent: #3b82f6;
+  /* Surfaces */
+  --paper: #f6f4ee;
+  --paper-2: #efece4;
+  --surface: #ffffff;
+  --surface-alt: #faf8f3;
 
-  --risk-high: #ef4444;
-  --risk-high-bg: rgba(239, 68, 68, 0.08);
-  --risk-high-border: rgba(239, 68, 68, 0.3);
+  /* Borders / rules */
+  --rule: #e7e2d4;
+  --border: #d6d0bf;
+  --border-strong: #a8a08c;
 
-  --risk-medium: #f59e0b;
-  --risk-medium-bg: rgba(245, 158, 11, 0.08);
-  --risk-medium-border: rgba(245, 158, 11, 0.3);
+  /* Ink (text) */
+  --ink: #1a1a1a;
+  --ink-2: #3f3f46;
+  --ink-muted: #6b6358;
+  --ink-faint: #8a8378;
 
-  --risk-low: #10b981;
-  --risk-low-bg: rgba(16, 185, 129, 0.08);
-  --risk-low-border: rgba(16, 185, 129, 0.3);
+  /* Institutional accents */
+  --navy: #0c2340;
+  --navy-2: #1c3a5e;
+  --link: #0a3a6f;
+  --link-hover: #06264a;
+
+  /* Crimson — used sparingly */
+  --crimson: #a51c2e;
+  --crimson-2: #861624;
+  --crimson-soft: #f5e4e6;
+
+  /* Risk tones */
+  --risk-high: #a51c2e;
+  --risk-high-bg: #f7e7e9;
+  --risk-high-rule: #e6c0c4;
+  --risk-medium: #8a5a00;
+  --risk-medium-bg: #f7eed3;
+  --risk-medium-rule: #e3d29e;
+  --risk-low: #1f5e3a;
+  --risk-low-bg: #e3eee5;
+  --risk-low-rule: #b9d2bf;
+
+  /* Misc */
+  --focus: #f5d142;
+  --input-focus-bg: #fffef5;
+  --skeleton-pulse: rgba(0, 0, 0, 0.04);
+  --texture: rgba(0, 0, 0, 0.014);
+  --grid-axis: rgba(0, 0, 0, 0.18);
+  --grid-line: rgba(0, 0, 0, 0.05);
+
+  /* Brand mark — fixed across themes for identity consistency */
+  --brand-bg: #0c2340;
+  --brand-fg: #ffffff;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dark theme — same institutional language, reversed.
+   Slate-navy paper, warm light ink, muted accents.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  --paper: #0e1219;
+  --paper-2: #141a25;
+  --surface: #1a2030;
+  --surface-alt: #161c28;
+
+  --rule: #232a3a;
+  --border: #2d3548;
+  --border-strong: #515c75;
+
+  --ink: #e6e9f0;
+  --ink-2: #c5cad6;
+  --ink-muted: #8d94a6;
+  --ink-faint: #5b6379;
+
+  --navy: #7fa9d6;
+  --navy-2: #a3c1de;
+  --link: #88b2dc;
+  --link-hover: #b9d3e9;
+
+  --crimson: #e87583;
+  --crimson-2: #f29ba6;
+  --crimson-soft: #2a1620;
+
+  --risk-high: #e87583;
+  --risk-high-bg: #2a1820;
+  --risk-high-rule: #4a2535;
+  --risk-medium: #d4a55a;
+  --risk-medium-bg: #2a2418;
+  --risk-medium-rule: #4a3f25;
+  --risk-low: #6dba8a;
+  --risk-low-bg: #182a20;
+  --risk-low-rule: #2a4a35;
+
+  --focus: #f5d142;
+  --input-focus-bg: #1f2638;
+  --skeleton-pulse: rgba(255, 255, 255, 0.045);
+  --texture: rgba(255, 255, 255, 0.01);
+  --grid-axis: rgba(255, 255, 255, 0.12);
+  --grid-line: rgba(255, 255, 255, 0.04);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-html {
-  color-scheme: dark;
-}
+/* Set color-scheme so native UI (scrollbars on Firefox, autofill, etc.) adapt */
+html { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'tnum', 'cv11', 'ss01';
+  transition: background-color 240ms ease, color 240ms ease;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+/* Subtle horizontal-line texture; rendered in either theme via --texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    0deg,
+    var(--texture) 0px,
+    var(--texture) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.6;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 2.5s ease-in-out infinite;
+/* During theme toggle, smooth ALL surfaces. The class is removed after ~280ms. */
+.theme-transitioning,
+.theme-transitioning *,
+.theme-transitioning *::before,
+.theme-transitioning *::after {
+  transition:
+    background-color 240ms ease,
+    border-color 240ms ease,
+    color 240ms ease,
+    fill 240ms ease,
+    stroke 240ms ease !important;
+  transition-delay: 0ms !important;
 }
 
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(16px); }
+::selection {
+  background: var(--focus);
+  color: #1a1a1a;
+}
+
+/* Scrollbar — minimal, document-like, theme-aware */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--paper-2); }
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border: 3px solid var(--paper-2);
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* ───────────────────────── Focus rings (gov-style yellow) ───────────────── */
+
+*:focus { outline: none; }
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 1px var(--ink) inset;
+}
+
+/* Default link styling — underlined, document-style */
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
+  transition: color 150ms ease, text-decoration-color 150ms ease;
+}
+a:hover { color: var(--link-hover); text-decoration-color: var(--link-hover); }
+a.no-underline { text-decoration: none; }
+
+/* ─────────────────────────────── Typography ─────────────────────────────── */
+
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.section-title {
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ink);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ink);
+  margin-bottom: 20px;
+  line-height: 1.2;
+}
+
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ───────────────────────────────── Tokens ───────────────────────────────── */
+
+.doc-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+.doc-card:hover { border-color: var(--border-strong); }
+
+.doc-card-alt {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+}
+
+.hr-rule { border: 0; border-top: 1px solid var(--rule); }
+.hr-strong { border: 0; border-top: 1px solid var(--ink); }
+
+/* ────────────────────────────── Animations ──────────────────────────────── */
+
+@keyframes locale-fade {
+  from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.locale-fade { animation: locale-fade 280ms ease both; }
 
-.animate-fade-in-up {
-  animation: fade-in-up 0.5s ease-out both;
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.row-in { animation: row-in 320ms ease both; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--paper-2) 0%,
+    var(--skeleton-pulse) 50%,
+    var(--paper-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border: 1px solid var(--rule);
+}
+
+/* ───────────────────────── Pill switch (lang + theme) ───────────────────── */
+
+.pill-switch {
+  position: relative;
+  display: inline-flex;
+  border: 1px solid var(--ink);
+  background: var(--surface);
+  height: 30px;
+  padding: 0;
+  overflow: hidden;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.pill-switch__indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--ink);
+  transform: translateX(0);
+  transition:
+    transform 320ms cubic-bezier(0.65, 0.05, 0.35, 1),
+    background-color 240ms ease;
+  will-change: transform;
+}
+
+.pill-switch[data-active-index="1"] .pill-switch__indicator { transform: translateX(100%); }
+
+.pill-switch__btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--ink);
+  transition: color 240ms ease;
+  font-feature-settings: 'tnum';
+}
+.pill-switch__btn[aria-pressed="true"] { color: var(--surface); }
+.pill-switch__btn:hover[aria-pressed="false"] { color: var(--navy); }
+
+.lang-switch .pill-switch__btn,
+.lang-switch .pill-switch__indicator { width: 44px; }
+
+.theme-switch .pill-switch__btn,
+.theme-switch .pill-switch__indicator { width: 36px; }
+
+.theme-switch .pill-switch__btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+/* ────────────────────────────── Inputs ──────────────────────────────────── */
+
+/* No horizontal padding shorthand here — let consumers control it via Tailwind
+   so utilities like `pl-10` (icon padding) actually take effect. */
+.doc-input {
+  width: 100%;
+  height: 44px;
+  padding-block: 0;
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  color: var(--ink);
+  caret-color: var(--ink);
+  font-size: 14px;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.doc-input::placeholder { color: var(--ink-faint); }
+.doc-input:focus { background: var(--input-focus-bg); }
+
+.doc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.doc-btn:hover { background: var(--ink); color: var(--surface); }
+.doc-btn--primary { background: var(--ink); color: var(--surface); }
+.doc-btn--primary:hover { background: var(--surface); color: var(--ink); }
+.doc-btn--danger { border-color: var(--crimson); color: var(--crimson); }
+.doc-btn--danger:hover { background: var(--crimson); color: var(--surface); }
+
+/* ─── Reduced motion respect ──────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

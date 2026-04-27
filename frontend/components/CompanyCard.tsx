@@ -1,91 +1,96 @@
+'use client';
+
 import Link from 'next/link';
 import type { Company } from '@/lib/api';
 import { getRiskLevel } from '@/lib/risk';
+import { useI18n } from '@/lib/i18n/I18nProvider';
 
 interface Props {
   company: Company;
   animationDelay?: number;
 }
 
-const riskConfig = {
+const riskTone = {
   high: {
-    label: 'Wysokie ryzyko',
-    badge: 'bg-red-500/10 text-red-400 border border-red-500/20',
-    border: 'border-red-500/30',
-    glow: 'hover:shadow-red-500/10',
-    scoreColor: 'text-red-400',
-    bar: 'bg-red-500',
+    swatch: 'bg-[var(--risk-high)]',
+    text: 'text-[var(--risk-high)]',
+    badge: 'bg-[var(--risk-high-bg)] text-[var(--risk-high)] border-[var(--risk-high-rule)]',
+    bar: 'bg-[var(--risk-high)]',
   },
   medium: {
-    label: 'Średnie ryzyko',
-    badge: 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20',
-    border: 'border-yellow-500/30',
-    glow: 'hover:shadow-yellow-500/10',
-    scoreColor: 'text-yellow-400',
-    bar: 'bg-yellow-500',
+    swatch: 'bg-[var(--risk-medium)]',
+    text: 'text-[var(--risk-medium)]',
+    badge: 'bg-[var(--risk-medium-bg)] text-[var(--risk-medium)] border-[var(--risk-medium-rule)]',
+    bar: 'bg-[var(--risk-medium)]',
   },
   low: {
-    label: 'Niskie ryzyko',
-    badge: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
-    border: 'border-emerald-500/30',
-    glow: 'hover:shadow-emerald-500/10',
-    scoreColor: 'text-emerald-400',
-    bar: 'bg-emerald-500',
+    swatch: 'bg-[var(--risk-low)]',
+    text: 'text-[var(--risk-low)]',
+    badge: 'bg-[var(--risk-low-bg)] text-[var(--risk-low)] border-[var(--risk-low-rule)]',
+    bar: 'bg-[var(--risk-low)]',
   },
-};
+} as const;
 
 export default function CompanyCard({ company, animationDelay = 0 }: Props) {
+  const { t } = useI18n();
   const risk = getRiskLevel(company.current_score);
-  const cfg = riskConfig[risk];
+  const tone = riskTone[risk];
+  const labels = {
+    high: t.card.riskHigh,
+    medium: t.card.riskMedium,
+    low: t.card.riskLow,
+  } as const;
 
   return (
     <Link
       href={`/companies/${company.id}`}
-      className="block animate-fade-in-up"
+      className="no-underline block row-in"
       style={{ animationDelay: `${animationDelay}ms` }}
     >
-      <div
-        className={`
-          h-full p-6 rounded-2xl border bg-[#0f1521] flex flex-col gap-5
-          transition-all duration-300
-          hover:scale-[1.02] hover:shadow-2xl
-          ${cfg.border} ${cfg.glow}
-        `}
+      <article
+        className="doc-card h-full p-5 flex flex-col gap-4 transition-colors hover:border-[var(--ink)]"
       >
-        {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold text-white truncate leading-snug">
-              {company.name}
-            </h3>
-            <p className="text-xs text-gray-500 font-mono mt-1">
-              NIP: {company.nip ?? '—'}
-            </p>
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <span className={`mt-1.5 w-2 h-2 ${tone.swatch} shrink-0`} aria-hidden="true" />
+            <div className="min-w-0">
+              <h3 className="text-[15px] font-semibold text-[var(--ink)] leading-snug truncate">
+                {company.name}
+              </h3>
+              <p className="text-[11px] text-[var(--ink-muted)] font-mono mt-1 tnum">
+                {t.card.nip}: {company.nip ?? '—'}
+              </p>
+            </div>
           </div>
-          <span className={`shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${cfg.badge}`}>
-            {cfg.label}
+          <span
+            className={`shrink-0 text-[10px] uppercase tracking-[0.12em] font-semibold px-2 py-0.5 border ${tone.badge}`}
+            style={{ borderRadius: '2px' }}
+          >
+            {labels[risk]}
           </span>
         </div>
 
-        {/* Score */}
-        <div className="flex items-end justify-between">
+        <hr className="hr-rule" />
+
+        <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Scoring reputacji</p>
-            <p className={`text-5xl font-black tabular-nums ${cfg.scoreColor}`}>
+            <p className="eyebrow mb-1">{t.card.score}</p>
+            <p className={`text-[42px] font-semibold tnum tracking-tight leading-none ${tone.text}`}>
               {company.current_score}
-              <span className="text-2xl font-semibold text-gray-600">/100</span>
+              <span className="text-base font-medium text-[var(--ink-faint)] ml-1">
+                {t.card.scoreOutOf}
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Bar */}
-        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+        <div className="h-1 w-full bg-[var(--paper-2)] border-t border-[var(--rule)]">
           <div
-            className={`h-full rounded-full ${cfg.bar} transition-all duration-700`}
+            className={`h-full ${tone.bar} transition-[width] duration-700 ease-out`}
             style={{ width: `${company.current_score}%` }}
           />
         </div>
-      </div>
+      </article>
     </Link>
   );
 }

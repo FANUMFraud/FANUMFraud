@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
+import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
 });
 
 const geistMono = Geist_Mono({
@@ -15,27 +17,25 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://fanumfraud.local"),
   title: {
-    default: "FANUMFraud",
-    template: "%s | FANUMFraud",
+    default: "FanumFraud — Rejestr ryzyka",
+    template: "%s · FanumFraud",
   },
   description:
-    "Platforma do monitoringu reputacji firm i analizy sygnałów AML na podstawie publikacji medialnych.",
-  applicationName: "FANUMFraud",
-  keywords: [
-    "AML",
-    "reputacja firm",
-    "monitoring mediów",
-    "risk scoring",
-    "due diligence",
-  ],
+    "Rejestr reputacji podmiotów gospodarczych i analiza sygnałów AML w oparciu o publikacje medialne.",
+  applicationName: "FanumFraud",
+  keywords: ["AML", "rejestr ryzyka", "reputacja firm", "due diligence"],
   openGraph: {
-    title: "FANUMFraud",
+    title: "FanumFraud — Rejestr ryzyka",
     description:
-      "Monitor reputacji firm wspierający procesy due diligence i analizę ryzyka AML.",
+      "Monitor reputacji podmiotów gospodarczych wspierający procesy due diligence i analizę ryzyka AML.",
     type: "website",
     locale: "pl_PL",
   },
 };
+
+// Runs before paint to set the data-theme attribute and avoid a light-flash
+// when the user prefers dark or has previously selected dark.
+const themeInitScript = `(function(){try{var s=localStorage.getItem('fanumfraud:theme');var d=s==='dark'||(s===null&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.documentElement.setAttribute('data-theme','dark');}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -45,9 +45,17 @@ export default function RootLayout({
   return (
     <html
       lang="pl"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body className="min-h-full flex flex-col">
+        <ThemeProvider>
+          <I18nProvider>{children}</I18nProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }
