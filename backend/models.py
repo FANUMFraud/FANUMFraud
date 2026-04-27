@@ -31,5 +31,6 @@ class ScoreHistory(Base):
     company_id = Column(Integer, ForeignKey("companies.id"))
     score = Column(Float)
     risk_score = Column(Float)
+    category = Column(String, default="neutralny")
     article_id = Column(Integer, ForeignKey("articles.id"))
     recorded_at = Column(DateTime, server_default=func.now())
