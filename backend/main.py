@@ -86,6 +86,18 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("Elasticsearch unavailable at startup -- search will use SQL fallback")
 
+    # Start scheduler
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from pipeline.ingest import run_ingest
+
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(run_ingest, "interval", minutes=15)
+        scheduler.start()
+        logger.info("Scheduler uruchomiony — ingest co 15 minut")
+    except Exception as e:
+        logger.warning(f"Scheduler nie uruchomiony: {e}")
+
     yield
     logger.info("Shutting down.")
 
