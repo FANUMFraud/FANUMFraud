@@ -14,7 +14,7 @@ This project was built for the Transparent Data hackathon challenge:
 - Backend API in FastAPI with:
   - company registry,
   - article ingestion + scraping,
-  - article analysis (LLM + heuristic fallback),
+  - article analysis (LLM extraction + deterministic scoring + heuristic fallback),
   - reputation scoring and anomaly detection endpoints,
   - scheduled pipeline jobs.
 - Frontend dashboard in Next.js with:
@@ -29,7 +29,8 @@ This project was built for the Transparent Data hackathon challenge:
 - Demo data:
   - Docker Compose runs `seed-demo` automatically,
   - seed creates 12 fictional companies, 1800 demo articles and score history points,
-  - seed is deterministic and safe to run multiple times.
+  - default seed is deterministic and safe to run multiple times,
+  - optional random seed mode can generate a fresh demo variant.
 
 ## Architecture
 
@@ -52,6 +53,15 @@ Main backend flow:
   - `high risk`: score `< 45`
   - `medium risk`: score `< 75`
   - `low risk`: score `>= 75`
+
+## Article scoring model (v2.1)
+
+- LLM is used only for structured extraction (`events`, `certainty`, `companies`, `evidence`, `keywords`).
+- Final `risk_score` is computed in backend by a deterministic formula (no direct trust in model-provided score).
+- Scoring uses calibrated weighted components: category severity, event certainty ladder, company role context, sentiment and text modifiers.
+- If LLM extraction is incomplete, lexical backstop logic from article text prevents obvious risk underestimation.
+- API response includes `score_breakdown` and `algorithm_version` for auditability.
+- Regression calibration cases are covered in `backend/tests/test_scoring_calibration.py` and `backend/tests/fixtures/article_calibration_cases.json`.
 
 ## Quick start (Docker)
 
@@ -120,11 +130,39 @@ Frontend expects backend at `http://localhost:8000` by default (`NEXT_PUBLIC_API
 
 ## Rerun demo seed manually
 
+Stable default dataset:
+
 ```bash
 docker compose run --rm seed-demo
 ```
 
-The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts the same deterministic dataset again.
+Fresh random demo variant:
+
+```bash
+docker compose build seed-demo
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
+```
+
+If the database stack is fully stopped, start dependencies first:
+
+```bash
+docker compose up -d postgres elasticsearch
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
+```
+
+Reproducible custom variant:
+
+```bash
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed 12345
+```
+
+Larger random dataset:
+
+```bash
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random --per-company 500
+```
+
+The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts a dataset for the selected seed.
 
 ## Useful manual pipeline commands
 
@@ -162,7 +200,7 @@ Backend tests:
 
 ```bash
 cd backend
-python -m pytest tests/test_scorer.py tests/test_anomaly_detector.py tests/test_analyzer_parser.py
+python -m pytest tests/test_scorer.py tests/test_anomaly_detector.py tests/test_analyzer_parser.py tests/test_scoring_calibration.py
 ```
 
 Frontend quality checks:

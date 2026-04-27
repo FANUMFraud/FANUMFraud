@@ -1,10 +1,13 @@
 # Pydantic v2 schemas for FanumFraud API.
 
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 # Company
+
 
 class CompanyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=512)
@@ -19,6 +22,13 @@ class StockPriceData(BaseModel):
     price: float
     change_percent: float
 
+class RiskMomentum(BaseModel):
+    window_days: int
+    current_score: float
+    past_score: float
+    delta: float
+    label: str
+
 
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -30,6 +40,8 @@ class CompanyResponse(BaseModel):
     created_at: datetime
     ticker_gpw: str | None = None
     stock_price: StockPriceData | None = None
+    momentum_7d: RiskMomentum | None = None
+    momentum_30d: RiskMomentum | None = None
 
 
 class ScorePoint(BaseModel):
@@ -44,10 +56,13 @@ class ScorePoint(BaseModel):
 class CompanyScoreResponse(BaseModel):
     company_id: int
     current_score: float
+    momentum_7d: RiskMomentum | None = None
+    momentum_30d: RiskMomentum | None = None
     history: list[ScorePoint]
 
 
 # Article
+
 
 class ArticleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -73,3 +88,5 @@ class ArticleAnalyzeResponse(BaseModel):
     kategoria: str
     waga_kontekstu: str
     uzasadnienie: str
+    algorytm_wersja: str | None = None
+    rozklad_score: dict[str, Any] | None = None

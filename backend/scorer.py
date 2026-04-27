@@ -66,7 +66,18 @@ class ReputationScorer:
     def signal_impact(self, signal: RiskSignal) -> float:
         sentiment_factor = self.SENTIMENT_FACTORS.get(signal.sentiment, self.SENTIMENT_FACTORS["neutral"])
         confidence_factor = self.confidence_floor + ((1.0 - self.confidence_floor) * signal.confidence)
-        return signal.risk_score * sentiment_factor * confidence_factor * signal.source_weight
+        
+        # Denial Recency: If event was denied, reduce impact based on how recent the denial is
+        # Fresh denial (1 day old) = 0.7x impact
+        # Old denial (14+ days old) = 0.4x impact
+        denial_penalty = 1.0
+        if signal.metadata.get("certainty") == "denied" and signal.metadata.get("denial_recency_days") is not None:
+            denial_days = signal.metadata["denial_recency_days"]
+            # Penalty: 1.0 - (0.3 × min(days / 14, 1.0))
+            denial_penalty = 1.0 - (0.3 * min(denial_days / 14.0, 1.0))
+            denial_penalty = max(denial_penalty, 0.4)  # Floor at 0.4
+        
+        return signal.risk_score * sentiment_factor * confidence_factor * signal.source_weight * denial_penalty
 
     def decayed_impact(self, signal: RiskSignal, as_of: datetime) -> float:
         normalized_as_of = _to_utc(as_of)

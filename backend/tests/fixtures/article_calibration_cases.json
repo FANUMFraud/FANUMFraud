@@ -1,0 +1,294 @@
+[
+  {
+    "name": "critical_confirmed_ml_sanctions_accused",
+    "article": {
+      "title": "Prawomocny wyrok w sprawie prania pieniedzy",
+      "content": "Sad wydal prawomocny wyrok. Media opisuja pranie pieniedzy, sankcje OFAC i zamrozenie aktywow."
+    },
+    "payload": {
+      "sentiment": "negative",
+      "confidence": 0.9,
+      "summary": "",
+      "risk_keywords": [
+        {
+          "keyword": "pranie pieniedzy",
+          "category": "money_laundering",
+          "mentions": 2,
+          "weight": 1.4
+        },
+        {
+          "keyword": "sankcje",
+          "category": "sanctions",
+          "mentions": 1,
+          "weight": 1.2
+        }
+      ],
+      "companies_mentioned": [
+        {
+          "name": "Acme SA",
+          "normalized_name": "acme sa",
+          "role": "accused",
+          "primary": true
+        }
+      ],
+      "events": [
+        {
+          "category": "money_laundering",
+          "title": "Money laundering conviction",
+          "description": "Court issued a final conviction.",
+          "severity": 1.0,
+          "certainty": "confirmed",
+          "companies": [
+            "Acme SA"
+          ],
+          "evidence": [
+            "prawomocny wyrok",
+            "pranie pieniedzy"
+          ]
+        },
+        {
+          "category": "sanctions",
+          "title": "Sanctions enforcement",
+          "description": "Assets were frozen due to sanctions investigation.",
+          "severity": 0.8,
+          "certainty": "investigated",
+          "companies": [
+            "Acme SA"
+          ],
+          "evidence": [
+            "sankcje OFAC"
+          ]
+        }
+      ]
+    },
+    "expected_min": 80.0,
+    "expected_max": 100.0,
+    "expected_risk_level": "critical"
+  },
+  {
+    "name": "high_investigated_corruption_accused",
+    "article": {
+      "title": "Sledztwo ws. korupcji i lapowek",
+      "content": "Prokuratura prowadzi sledztwo. W materiale pojawiaja sie zarzuty korupcyjne i opisy lapowek."
+    },
+    "payload": {
+      "sentiment": "negative",
+      "confidence": 0.82,
+      "summary": "",
+      "risk_keywords": [
+        {
+          "keyword": "korupcja",
+          "category": "corruption",
+          "mentions": 2,
+          "weight": 1.3
+        }
+      ],
+      "companies_mentioned": [
+        {
+          "name": "Beta SA",
+          "normalized_name": "beta sa",
+          "role": "accused",
+          "primary": true
+        }
+      ],
+      "events": [
+        {
+          "category": "corruption",
+          "title": "Corruption probe",
+          "description": "Authorities opened a probe.",
+          "severity": 0.75,
+          "certainty": "investigated",
+          "companies": [
+            "Beta SA"
+          ],
+          "evidence": [
+            "prowadzi sledztwo"
+          ]
+        }
+      ]
+    },
+    "expected_min": 45.0,
+    "expected_max": 90.0,
+    "expected_risk_level": "high"
+  },
+  {
+    "name": "medium_alleged_fraud_with_uncertainty",
+    "article": {
+      "title": "Rzekome oszustwo badane przez media",
+      "content": "Pojawily sie rzekome doniesienia o oszustwie. Informacje sa niepotwierdzone i oparte na anonimowych zrodlach."
+    },
+    "payload": {
+      "sentiment": "mixed",
+      "confidence": 0.55,
+      "summary": "",
+      "risk_keywords": [
+        {
+          "keyword": "oszustwo",
+          "category": "fraud",
+          "mentions": 1,
+          "weight": 1.0
+        }
+      ],
+      "companies_mentioned": [
+        {
+          "name": "Gamma SA",
+          "normalized_name": "gamma sa",
+          "role": "mentioned",
+          "primary": true
+        }
+      ],
+      "events": [
+        {
+          "category": "fraud",
+          "title": "Alleged fraud mention",
+          "description": "Unconfirmed media allegations.",
+          "severity": 0.5,
+          "certainty": "alleged",
+          "companies": [
+            "Gamma SA"
+          ],
+          "evidence": [
+            "rzekome doniesienia"
+          ]
+        }
+      ]
+    },
+    "expected_min": 6.0,
+    "expected_max": 42.0,
+    "expected_risk_level": "low"
+  },
+  {
+    "name": "low_denied_case_company_as_victim",
+    "article": {
+      "title": "Spolka zaprzecza oskarzeniom",
+      "content": "Firma zaprzecza zarzutom. Doniesienia uznano za plotki, a spolka jest wskazywana jako potencjalna ofiara."
+    },
+    "payload": {
+      "sentiment": "neutral",
+      "confidence": 0.62,
+      "summary": "",
+      "risk_keywords": [],
+      "companies_mentioned": [
+        {
+          "name": "Delta SA",
+          "normalized_name": "delta sa",
+          "role": "victim",
+          "primary": true
+        }
+      ],
+      "events": [
+        {
+          "category": "legal",
+          "title": "Denied allegations",
+          "description": "Company denied accusations.",
+          "severity": 0.4,
+          "certainty": "denied",
+          "companies": [
+            "Delta SA"
+          ],
+          "evidence": [
+            "zaprzecza zarzutom"
+          ]
+        }
+      ]
+    },
+    "expected_min": 0.0,
+    "expected_max": 15.0,
+    "expected_risk_level": "low"
+  },
+  {
+    "name": "very_low_positive_without_risk_signals",
+    "article": {
+      "title": "Pozytywny raport compliance",
+      "content": "Spolka otrzymala compliance award i pozytywna ocene audytu. Brak nieprawidlowosci i brak zarzutow."
+    },
+    "payload": {
+      "sentiment": "positive",
+      "confidence": 0.88,
+      "summary": "",
+      "risk_keywords": [],
+      "companies_mentioned": [
+        {
+          "name": "Epsilon SA",
+          "normalized_name": "epsilon sa",
+          "role": "mentioned",
+          "primary": true
+        }
+      ],
+      "events": []
+    },
+    "expected_min": 0.0,
+    "expected_max": 8.0,
+    "expected_risk_level": "low"
+  },
+  {
+    "name": "text_backstop_when_llm_returns_empty_structures",
+    "article": {
+      "title": "Doniesienia o korupcji i praniu pieniedzy",
+      "content": "Media opisuja korupcje, lapowki i mozliwe pranie pieniedzy w relacjach z kontrahentami."
+    },
+    "payload": {
+      "sentiment": "neutral",
+      "confidence": 0.7,
+      "summary": "",
+      "risk_keywords": [],
+      "companies_mentioned": [],
+      "events": []
+    },
+    "expected_min": 20.0,
+    "expected_max": 55.0,
+    "expected_risk_level": "medium"
+  },
+  {
+    "name": "governance_regulatory_context_not_extreme",
+    "article": {
+      "title": "Regulator sprawdza polityki governance",
+      "content": "Regulator wszczal kontrole polityk governance i zgodnosci, bez informacji o wyrokach lub sankcjach."
+    },
+    "payload": {
+      "sentiment": "mixed",
+      "confidence": 0.68,
+      "summary": "",
+      "risk_keywords": [
+        {
+          "keyword": "governance",
+          "category": "governance",
+          "mentions": 1,
+          "weight": 1.0
+        },
+        {
+          "keyword": "regulator",
+          "category": "regulatory",
+          "mentions": 1,
+          "weight": 1.0
+        }
+      ],
+      "companies_mentioned": [
+        {
+          "name": "Zeta SA",
+          "normalized_name": "zeta sa",
+          "role": "regulator",
+          "primary": true
+        }
+      ],
+      "events": [
+        {
+          "category": "regulatory",
+          "title": "Regulatory review",
+          "description": "Authority started a review.",
+          "severity": 0.45,
+          "certainty": "investigated",
+          "companies": [
+            "Zeta SA"
+          ],
+          "evidence": [
+            "wszczal kontrole"
+          ]
+        }
+      ]
+    },
+    "expected_min": 12.0,
+    "expected_max": 48.0,
+    "expected_risk_level": "medium"
+  }
+]
