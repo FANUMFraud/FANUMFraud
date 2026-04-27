@@ -1,10 +1,13 @@
 # Pydantic v2 schemas for FanumFraud API.
 
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 # Company
+
 
 class CompanyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=512)
@@ -39,6 +42,7 @@ class CompanyScoreResponse(BaseModel):
 
 # Article
 
+
 class ArticleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -63,3 +67,5 @@ class ArticleAnalyzeResponse(BaseModel):
     kategoria: str
     waga_kontekstu: str
     uzasadnienie: str
+    algorytm_wersja: str | None = None
+    rozklad_score: dict[str, Any] | None = None

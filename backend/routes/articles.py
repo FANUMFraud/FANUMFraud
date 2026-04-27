@@ -22,6 +22,7 @@ article_analyzer = ArticleAnalyzer()
 
 # POST /articles/analyze
 
+
 @router.post("/analyze", response_model=ArticleAnalyzeResponse)
 def analyze_article(payload: ArticleAnalyzeRequest):
     """
@@ -62,7 +63,9 @@ def analyze_article(payload: ArticleAnalyzeRequest):
             detail="Either 'url' or 'content' must be provided",
         )
 
-    candidate_companies = [payload.company_name.strip()] if payload.company_name.strip() else []
+    candidate_companies = (
+        [payload.company_name.strip()] if payload.company_name.strip() else []
+    )
 
     try:
         analysis = article_analyzer.analyze(
@@ -88,13 +91,19 @@ def analyze_article(payload: ArticleAnalyzeRequest):
         kategoria=category,
         waga_kontekstu=context_weight,
         uzasadnienie=analysis.summary,
+        algorytm_wersja=analysis.algorithm_version,
+        rozklad_score=analysis.score_breakdown,
     )
 
 
 def _analysis_category(analysis) -> str:
     if analysis.events:
         first_category = analysis.events[0].category
-        return first_category.value if hasattr(first_category, "value") else str(first_category)
+        return (
+            first_category.value
+            if hasattr(first_category, "value")
+            else str(first_category)
+        )
     if analysis.risk_keywords:
         return str(analysis.risk_keywords[0].category)
     return analysis.risk_level.value
@@ -109,6 +118,7 @@ def _context_weight(risk_level: str) -> str:
 
 
 # GET /articles
+
 
 @router.get("", response_model=list[ArticleResponse])
 def list_articles(
@@ -132,15 +142,11 @@ def list_articles(
     if date_to is not None:
         query = query.filter(Article.published_at <= date_to)
 
-    return (
-        query.order_by(Article.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    return query.order_by(Article.created_at.desc()).offset(skip).limit(limit).all()
 
 
 # GET /articles/{article_id}
+
 
 @router.get("/{article_id}", response_model=ArticleResponse)
 def get_article(article_id: int, db: Session = Depends(get_db)):

@@ -14,7 +14,7 @@ This project was built for the Transparent Data hackathon challenge:
 - Backend API in FastAPI with:
   - company registry,
   - article ingestion + scraping,
-  - article analysis (LLM + heuristic fallback),
+  - article analysis (LLM extraction + deterministic scoring + heuristic fallback),
   - reputation scoring and anomaly detection endpoints,
   - scheduled pipeline jobs.
 - Frontend dashboard in Next.js with:
@@ -53,6 +53,15 @@ Main backend flow:
   - `high risk`: score `< 45`
   - `medium risk`: score `< 75`
   - `low risk`: score `>= 75`
+
+## Article scoring model (v2.1)
+
+- LLM is used only for structured extraction (`events`, `certainty`, `companies`, `evidence`, `keywords`).
+- Final `risk_score` is computed in backend by a deterministic formula (no direct trust in model-provided score).
+- Scoring uses calibrated weighted components: category severity, event certainty ladder, company role context, sentiment and text modifiers.
+- If LLM extraction is incomplete, lexical backstop logic from article text prevents obvious risk underestimation.
+- API response includes `score_breakdown` and `algorithm_version` for auditability.
+- Regression calibration cases are covered in `backend/tests/test_scoring_calibration.py` and `backend/tests/fixtures/article_calibration_cases.json`.
 
 ## Quick start (Docker)
 
@@ -191,7 +200,7 @@ Backend tests:
 
 ```bash
 cd backend
-python -m pytest tests/test_scorer.py tests/test_anomaly_detector.py tests/test_analyzer_parser.py
+python -m pytest tests/test_scorer.py tests/test_anomaly_detector.py tests/test_analyzer_parser.py tests/test_scoring_calibration.py
 ```
 
 Frontend quality checks:
