@@ -56,16 +56,17 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
       style={{ animationDelay: `${animationDelay}ms` }}
     >
       <article
-        className="doc-card h-full p-5 flex flex-col gap-4 transition-colors hover:border-[var(--ink)]"
+        className="doc-card h-full flex flex-col transition-colors"
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="px-4 py-3 border-b border-[var(--rule)] bg-[var(--surface-alt)] flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0 flex-1">
-            <span className={`mt-1.5 w-2 h-2 ${tone.swatch} shrink-0`} aria-hidden="true" />
+            <span className={`mt-1 w-2.5 h-8 ${tone.swatch} shrink-0`} aria-hidden="true" />
             <div className="min-w-0">
-              <h3 className="text-[15px] font-semibold text-[var(--ink)] leading-snug truncate">
+              <p className="eyebrow mb-1">{locale === 'pl' ? 'Podmiot rejestru' : 'Registry entity'}</p>
+              <h3 className="text-[16px] font-extrabold text-[var(--ink)] leading-snug truncate">
                 {company.name}
               </h3>
-              <div className="text-[11px] text-[var(--ink-muted)] font-mono mt-1 tnum flex flex-wrap gap-x-3 gap-y-1">
+              <div className="text-[11px] text-[var(--ink-muted)] font-mono mt-2 tnum flex flex-wrap gap-x-3 gap-y-1">
                 <span>{t.card.nip}: {company.nip ?? '—'}</span>
                 {company.ticker_gpw && (
                   <span className="text-[var(--ink-2)]">GPW: {company.ticker_gpw}</span>
@@ -74,19 +75,17 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
             </div>
           </div>
           <span
-            className={`shrink-0 text-[10px] uppercase tracking-[0.12em] font-semibold px-2 py-0.5 border ${tone.badge}`}
-            style={{ borderRadius: '2px' }}
+            className={`shrink-0 text-[10px] uppercase tracking-[0.12em] font-extrabold px-2 py-1 border ${tone.badge}`}
+            style={{ borderRadius: 0 }}
           >
             {labels[risk]}
           </span>
         </div>
 
-        <hr className="hr-rule" />
-
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="eyebrow mb-1">{t.card.score}</p>
-            <p className={`text-[42px] font-semibold tnum tracking-tight leading-none ${tone.text}`}>
+        <div className="p-4 flex-1 flex items-end justify-between gap-4">
+          <div className="border-l-4 pl-3" style={{ borderColor: `var(--risk-${risk})` }}>
+            <p className="eyebrow mb-2">{t.card.score}</p>
+            <p className={`text-[44px] font-extrabold tnum tracking-tight leading-none ${tone.text}`}>
               {formatScore(company.current_score)}
               <span className="text-base font-medium text-[var(--ink-faint)] ml-1">
                 {t.card.scoreOutOf}
@@ -94,18 +93,18 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
             </p>
           </div>
           {momentum && (
-            <div className={`px-2.5 py-1.5 border text-right ${momentumStyle[momentumDirection]}`}>
-              <p className="text-[10px] uppercase tracking-[0.1em] font-semibold">
+            <div className={`px-3 py-2 border text-right ${momentumStyle[momentumDirection]}`}>
+              <p className="text-[10px] uppercase tracking-[0.1em] font-extrabold">
                 {locale === 'pl' ? 'Trend 7d' : '7d trend'}
               </p>
-              <p className="text-sm font-semibold tnum leading-none mt-1">
+              <p className="text-base font-extrabold tnum leading-none mt-1">
                 {momentumSymbol(momentumDelta)} {formatMomentumDelta(momentumDelta)}
               </p>
             </div>
           )}
         </div>
 
-        <div className="h-1 w-full bg-[var(--paper-2)] border-t border-[var(--rule)]">
+        <div className="h-2 w-full bg-[var(--paper-2)] border-t border-[var(--rule)]">
           <div
             className={`h-full ${tone.bar} transition-[width] duration-700 ease-out`}
             style={{ width: `${Math.max(0, Math.min(100, company.current_score))}%` }}

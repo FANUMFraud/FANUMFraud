@@ -1,18 +1,148 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { getCompanies, type Company } from '@/lib/api';
 import CompanyCard from '@/components/CompanyCard';
 import SearchBar from '@/components/SearchBar';
 import Header from '@/components/Header';
 import LocaleFade from '@/components/LocaleFade';
-import { getRiskLevel } from '@/lib/risk';
+import { formatMomentumDelta, formatScore, getRiskLevel, momentumSymbol, momentumTone } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
 type SortMode = 'risk_desc' | 'risk_asc' | 'trend_desc' | 'name';
 
 function isDemoCompany(company: Company): boolean {
   return Boolean(company.nip?.startsWith('10100000'));
+}
+
+const riskBadgeClass = {
+  high: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  medium: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+  low: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+} as const;
+
+const momentumBadgeClass = {
+  bad: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  neutral: 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+  good: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+} as const;
+
+interface RegistrySectionProps {
+  title: string;
+  companies: Company[];
+  locale: string;
+  nipLabel: string;
+  riskLabels: Readonly<Record<'high' | 'medium' | 'low', string>>;
+  animationOffset?: number;
+}
+
+function RegistrySection({ title, companies, locale, nipLabel, riskLabels, animationOffset = 0 }: RegistrySectionProps) {
+  const labels = {
+    entity: locale === 'pl' ? 'Podmiot' : 'Entity',
+    source: locale === 'pl' ? 'Źródło' : 'Source',
+    stock: 'GPW',
+    score: locale === 'pl' ? 'Score' : 'Score',
+    risk: locale === 'pl' ? 'Ryzyko' : 'Risk',
+    trend: locale === 'pl' ? 'Trend 7d' : '7d trend',
+    sanctions: locale === 'pl' ? 'Sankcje' : 'Sanctions',
+    online: locale === 'pl' ? 'Dane online' : 'Online data',
+    demo: locale === 'pl' ? 'Dane demo' : 'Demo data',
+    clear: locale === 'pl' ? 'Brak wpisu' : 'Clear',
+    listed: locale === 'pl' ? 'Na liście' : 'Listed',
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-4 mb-4 bg-[var(--surface)] border border-[var(--border)] px-4 py-3">
+        <p className="eyebrow">{title} · {companies.length}</p>
+        <hr className="hr-rule flex-1" />
+      </div>
+
+      <div className="hidden lg:block border border-[var(--border)] bg-[var(--surface)] overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-[var(--gov-blue)] text-white">
+            <tr>
+              {[labels.entity, labels.source, labels.stock, labels.score, labels.risk, labels.trend, labels.sanctions].map((label) => (
+                <th key={label} className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.08em] font-extrabold border-r border-white/20 last:border-r-0">
+                  {label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--rule)]">
+            {companies.map((company) => {
+              const risk = getRiskLevel(company.current_score);
+              const momentumDelta = company.momentum_7d?.delta ?? 0;
+              const momentumDirection = momentumTone(momentumDelta);
+              const sourceIsDemo = isDemoCompany(company);
+              return (
+                <tr key={company.id} className="hover:bg-[var(--surface-alt)] transition-colors">
+                  <td className="px-4 py-3 min-w-[280px] border-r border-[var(--rule)]">
+                    <Link href={`/companies/${company.id}`} className="font-extrabold text-[var(--ink)] hover:text-[var(--link)]">
+                      {company.name}
+                    </Link>
+                    <div className="mt-1 flex items-center gap-3 text-[11px] text-[var(--ink-muted)] font-mono tnum">
+                      <span>{nipLabel}: {company.nip ?? '—'}</span>
+                      <span>ID: {company.id}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 border-r border-[var(--rule)]">
+                    <span className={[
+                      'inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold',
+                      sourceIsDemo
+                        ? 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]'
+                        : 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+                    ].join(' ')}>
+                      {sourceIsDemo ? labels.demo : labels.online}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-r border-[var(--rule)] font-mono tnum text-[var(--ink-2)]">
+                    {company.ticker_gpw ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 border-r border-[var(--rule)]">
+                    <span className="text-2xl font-extrabold tnum" style={{ color: `var(--risk-${risk})` }}>
+                      {formatScore(company.current_score)}
+                    </span>
+                    <span className="text-[11px] text-[var(--ink-faint)] ml-1">/100</span>
+                  </td>
+                  <td className="px-4 py-3 border-r border-[var(--rule)]">
+                    <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${riskBadgeClass[risk]}`}>
+                      {riskLabels[risk]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 border-r border-[var(--rule)]">
+                    {company.momentum_7d ? (
+                      <span className={`inline-flex px-2 py-1 border text-[12px] font-extrabold tnum ${momentumBadgeClass[momentumDirection]}`}>
+                        {momentumSymbol(momentumDelta)} {formatMomentumDelta(momentumDelta)}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--ink-faint)]">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${company.sanctions?.is_sanctioned ? riskBadgeClass.high : 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]'}`}>
+                      {company.sanctions?.is_sanctioned ? labels.listed : labels.clear}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:hidden">
+        {companies.map((company, i) => (
+          <CompanyCard
+            key={company.id}
+            company={company}
+            animationDelay={Math.min((animationOffset + i) * 35, 280)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -68,6 +198,11 @@ export default function DashboardPage() {
     { key: 'medium', label: t.dashboard.statMedium, value: medRisk, color: 'var(--risk-medium)' },
     { key: 'low', label: t.dashboard.statLow, value: lowRisk, color: 'var(--risk-low)' },
   ];
+  const riskLabels = {
+    high: t.card.riskHigh,
+    medium: t.card.riskMedium,
+    low: t.card.riskLow,
+  } as const;
 
   const today = new Date();
 
@@ -91,24 +226,57 @@ export default function DashboardPage() {
       <LocaleFade>
         <main className="flex-1">
           <section className="bg-[var(--surface)] border-b border-[var(--border)]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-              <div className="max-w-3xl">
-                <p className="eyebrow mb-3">
-                  {locale === 'pl' ? 'Rejestr publiczny · Dane online' : 'Public registry · Live data'}
-                </p>
-                <h1 className="text-3xl sm:text-[40px] font-semibold tracking-tight text-[var(--ink)] leading-[1.1]">
-                  {t.dashboard.title}{' '}
-                  <span style={{ color: 'var(--crimson)' }}>{t.dashboard.titleAccent}</span>
-                </h1>
-                <p className="mt-3 text-[var(--ink-2)] text-base leading-relaxed max-w-2xl">
-                  {t.dashboard.subtitle}
-                </p>
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+              <div className="gov-panel">
+                <div className="gov-section-header">
+                  <span>{locale === 'pl' ? 'Centralny rejestr oceny ryzyka' : 'Central risk assessment registry'}</span>
+                  <span className="hidden sm:inline tnum">FANUM-AML-01</span>
+                </div>
+                <div className="p-5 sm:p-7 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+                  <div>
+                    <p className="eyebrow mb-3">
+                      {locale === 'pl' ? 'Rejestr publiczny · Dane online i demonstracyjne' : 'Public registry · Online and demo data'}
+                    </p>
+                    <h1 className="text-3xl sm:text-[42px] font-extrabold tracking-tight text-[var(--ink)] leading-[1.05]">
+                      {t.dashboard.title}{' '}
+                      <span style={{ color: 'var(--crimson)' }}>{t.dashboard.titleAccent}</span>
+                    </h1>
+                    <p className="mt-4 text-[var(--ink-2)] text-base leading-7 max-w-3xl">
+                      {t.dashboard.subtitle}
+                    </p>
+                  </div>
+                  <div className="border border-[var(--border)] bg-[var(--surface-alt)]">
+                    <div className="gov-meta-row">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Status' : 'Status'}</div>
+                      <div className="gov-meta-value font-semibold">{locale === 'pl' ? 'Aktywny monitoring' : 'Active monitoring'}</div>
+                    </div>
+                    <div className="gov-meta-row">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Zakres' : 'Scope'}</div>
+                      <div className="gov-meta-value">AML / media / sanctions / GPW</div>
+                    </div>
+                    <div className="gov-meta-row">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Aktualizacja' : 'Updated'}</div>
+                      <div className="gov-meta-value tnum">{lastUpdated ? formatTime(lastUpdated) : '—'}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
           <section className="bg-[var(--paper-2)] border-b border-[var(--border)]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7">
+              <div className="mb-3 flex items-center gap-3">
+                <span className="w-2 h-8 bg-[var(--gov-blue)]" aria-hidden="true" />
+                <div>
+                  <p className="text-[13px] font-extrabold uppercase tracking-[0.08em] text-[var(--ink)]">
+                    {locale === 'pl' ? 'Wyszukiwarka rejestru' : 'Registry search'}
+                  </p>
+                  <p className="text-[12px] text-[var(--ink-muted)]">
+                    {locale === 'pl' ? 'Nazwa podmiotu, NIP lub alias' : 'Entity name, tax ID or alias'}
+                  </p>
+                </div>
+              </div>
               <SearchBar />
             </div>
           </section>
@@ -116,9 +284,9 @@ export default function DashboardPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
             {!loading && !error && (
               <section>
-                <h2 className="section-title">
-                  {locale === 'pl' ? 'Podsumowanie ryzyka' : 'Risk summary'}
-                </h2>
+                  <h2 className="section-title">
+                    {locale === 'pl' ? 'Podsumowanie ryzyka' : 'Risk summary'}
+                  </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-0 border border-[var(--border)] bg-[var(--surface)]">
                   {stats.map((s, idx) => (
                     <div
@@ -152,7 +320,7 @@ export default function DashboardPage() {
             <section>
               <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
                 <div>
-                  <h2 className="text-[15px] font-semibold uppercase tracking-[0.1em] text-[var(--ink)]">
+                  <h2 className="text-[15px] font-extrabold uppercase tracking-[0.1em] text-[var(--ink)]">
                     {locale === 'pl' ? 'Wykaz podmiotów' : 'Entity list'}
                   </h2>
                   <p className="text-[12px] text-[var(--ink-muted)] mt-1">
@@ -161,7 +329,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="eyebrow !text-[10px]">{t.dashboard.sortBy}</span>
-                  <div className="inline-flex border border-[var(--ink)]">
+                  <div className="inline-flex border border-[var(--border-strong)] bg-[var(--surface)]">
                     {sortOptions.map(([val, label], i) => (
                       <button
                         key={val}
@@ -170,7 +338,7 @@ export default function DashboardPage() {
                           'px-3 h-8 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors',
                           i !== 0 ? 'border-l border-[var(--ink)]' : '',
                           sort === val
-                            ? 'bg-[var(--ink)] text-[var(--surface)]'
+                            ? 'bg-[var(--gov-blue)] text-white'
                             : 'bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--paper-2)]',
                         ].join(' ')}
                       >
@@ -220,43 +388,24 @@ export default function DashboardPage() {
               {!loading && !error && sorted.length > 0 && (
                 <div className="space-y-10">
                   {onlineCompanies.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between gap-4 mb-4">
-                        <p className="eyebrow">
-                          {locale === 'pl' ? 'Dane internetowe' : 'Online data'} · {onlineCompanies.length}
-                        </p>
-                        <hr className="hr-rule flex-1" />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {onlineCompanies.map((company, i) => (
-                          <CompanyCard
-                            key={company.id}
-                            company={company}
-                            animationDelay={Math.min(i * 35, 280)}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <RegistrySection
+                      title={locale === 'pl' ? 'Dane internetowe' : 'Online data'}
+                      companies={onlineCompanies}
+                      locale={locale}
+                      nipLabel={t.card.nip}
+                      riskLabels={riskLabels}
+                    />
                   )}
 
                   {demoCompanies.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between gap-4 mb-4">
-                        <p className="eyebrow">
-                          {locale === 'pl' ? 'Dane demo' : 'Demo data'} · {demoCompanies.length}
-                        </p>
-                        <hr className="hr-rule flex-1" />
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {demoCompanies.map((company, i) => (
-                          <CompanyCard
-                            key={company.id}
-                            company={company}
-                            animationDelay={Math.min(i * 35, 280)}
-                          />
-                        ))}
-                      </div>
-                    </div>
+                    <RegistrySection
+                      title={locale === 'pl' ? 'Dane demo' : 'Demo data'}
+                      companies={demoCompanies}
+                      locale={locale}
+                      nipLabel={t.card.nip}
+                      riskLabels={riskLabels}
+                      animationOffset={onlineCompanies.length}
+                    />
                   )}
                 </div>
               )}

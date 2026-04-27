@@ -21,29 +21,29 @@ interface Props {
 }
 
 const lightChart = {
-  line: '#0c2340',
-  dotStroke: '#0c2340',
+  line: '#003064',
+  dotStroke: '#003064',
   dotFill: '#ffffff',
-  activeDotFill: '#0c2340',
-  axis: 'rgba(0,0,0,0.18)',
-  axisTick: '#6b6358',
-  grid: 'rgba(0,0,0,0.05)',
-  cursor: 'rgba(0,0,0,0.25)',
+  activeDotFill: '#003064',
+  axis: 'rgba(17,24,39,0.35)',
+  axisTick: '#526273',
+  grid: 'rgba(17,24,39,0.10)',
+  cursor: 'rgba(0,48,100,0.35)',
   refMedium: 'rgba(138,90,0,0.45)',
   refMediumLabel: '#8a5a00',
-  refHigh: 'rgba(165,28,46,0.45)',
-  refHighLabel: '#a51c2e',
+  refHigh: 'rgba(176,0,32,0.45)',
+  refHighLabel: '#b00020',
 };
 
 const darkChart = {
-  line: '#a3c1de',
-  dotStroke: '#a3c1de',
-  dotFill: '#0e1219',
-  activeDotFill: '#a3c1de',
-  axis: 'rgba(255,255,255,0.16)',
-  axisTick: '#8d94a6',
-  grid: 'rgba(255,255,255,0.05)',
-  cursor: 'rgba(255,255,255,0.30)',
+  line: '#7eb6f0',
+  dotStroke: '#7eb6f0',
+  dotFill: '#0b1220',
+  activeDotFill: '#7eb6f0',
+  axis: 'rgba(238,244,251,0.28)',
+  axisTick: '#a1afc1',
+  grid: 'rgba(238,244,251,0.08)',
+  cursor: 'rgba(126,182,240,0.35)',
   refMedium: 'rgba(212,165,90,0.55)',
   refMediumLabel: '#d4a55a',
   refHigh: 'rgba(232,117,131,0.55)',
@@ -127,10 +127,7 @@ export default function ScoreChart({ history }: Props) {
   }
 
   return (
-    <div
-      className="w-full h-80 bg-[var(--surface)] border border-[var(--border)] p-5"
-      style={{ borderRadius: '2px' }}
-    >
+    <div className="w-full h-80 bg-[var(--surface)] border border-[var(--border)] border-t-4 border-t-[var(--gov-blue)] p-5">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 10, right: 14, bottom: 0, left: -16 }}>
           <CartesianGrid stroke={c.grid} vertical={false} />

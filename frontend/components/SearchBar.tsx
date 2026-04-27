@@ -53,7 +53,7 @@ export default function SearchBar() {
   }, [query]);
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-2xl mx-auto z-40">
+    <div ref={containerRef} className="relative w-full z-40">
       <div className="relative flex items-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -69,7 +69,7 @@ export default function SearchBar() {
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t.search.placeholder}
           aria-label={t.search.placeholder}
-          className="doc-input pl-12 pr-14"
+          className="doc-input pl-12 pr-16"
         />
 
         {loading && (
@@ -79,7 +79,7 @@ export default function SearchBar() {
         )}
 
         {!loading && query.trim().length > 0 && query.trim().length < 2 && (
-          <span className="absolute right-4 text-[10px] uppercase tracking-[0.12em] text-[var(--ink-muted)] pointer-events-none">
+          <span className="absolute right-4 text-[10px] uppercase tracking-[0.12em] font-extrabold text-[var(--ink-muted)] pointer-events-none">
             {t.search.hint}
           </span>
         )}
@@ -87,7 +87,7 @@ export default function SearchBar() {
 
       {isOpen && (
         <div
-          className="absolute mt-[-1px] w-full bg-[var(--surface)] border border-[var(--ink)] border-t-0"
+          className="absolute mt-[-1px] w-full bg-[var(--surface)] border-2 border-[var(--border-strong)] border-t-0 shadow-[0_8px_0_rgba(17,24,39,0.08)]"
           style={{ borderRadius: 0 }}
         >
           {results.length > 0 ? (
@@ -103,7 +103,7 @@ export default function SearchBar() {
                 ].join(' ')}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-[var(--ink)] text-sm truncate">{company.name}</p>
+                  <p className="font-extrabold text-[var(--ink)] text-sm truncate">{company.name}</p>
                   {company.nip && (
                     <p className="text-[11px] text-[var(--ink-muted)] font-mono mt-0.5 tnum">
                       {t.card.nip}: {company.nip}

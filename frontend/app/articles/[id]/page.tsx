@@ -100,48 +100,56 @@ export default function ArticlePage() {
         <main className="flex-1">
           <section className="bg-[var(--surface)] border-b border-[var(--border)]">
             <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-              <p className="eyebrow mb-3">
-                {locale === 'pl' ? 'Publikacja zrodlowa' : 'Source publication'}
-                {' - '}#{article.id}
-              </p>
-              <h1 className="text-3xl sm:text-[38px] font-semibold tracking-tight text-[var(--ink)] leading-[1.1]">
-                {article.title || (locale === 'pl' ? 'Artykul bez tytulu' : 'Untitled article')}
-              </h1>
-              <div className="flex items-center gap-x-5 gap-y-2 flex-wrap mt-4 text-[12px] text-[var(--ink-muted)]">
-                {article.source && (
-                  <span>
-                    <span className="font-semibold text-[var(--ink-2)]">{t.detail.articleSource}:</span>{' '}
-                    <span className="font-mono">{article.source}</span>
-                  </span>
-                )}
-                {article.published_at && (
-                  <span className="tnum">
-                    {formatDate(article.published_at, {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </span>
-                )}
-                <span
-                  className="px-2 py-0.5 border font-semibold uppercase tracking-[0.1em] text-[10px]"
-                  style={{
-                    background: article.processed ? 'var(--risk-low-bg)' : 'var(--risk-medium-bg)',
-                    borderColor: article.processed ? 'var(--risk-low-rule)' : 'var(--risk-medium-rule)',
-                    color: article.processed ? 'var(--risk-low)' : 'var(--risk-medium)',
-                    borderRadius: '2px',
-                  }}
-                >
-                  {article.processed
-                    ? locale === 'pl' ? 'Przetworzony' : 'Processed'
-                    : locale === 'pl' ? 'Nieprzetworzony' : 'Pending'}
-                </span>
+              <div className="gov-panel">
+                <div className="gov-section-header">
+                  <span>{locale === 'pl' ? 'Publikacja zrodlowa' : 'Source publication'} · #{article.id}</span>
+                  <span>{article.processed ? locale === 'pl' ? 'Przetworzony' : 'Processed' : locale === 'pl' ? 'Oczekuje' : 'Pending'}</span>
+                </div>
+                <div className="p-5 sm:p-7">
+                  <p className="eyebrow mb-3">
+                    {locale === 'pl' ? 'Material dowodowy w profilu ryzyka' : 'Evidence material in risk profile'}
+                  </p>
+                  <h1 className="text-3xl sm:text-[38px] font-extrabold tracking-tight text-[var(--ink)] leading-[1.08]">
+                    {article.title || (locale === 'pl' ? 'Artykul bez tytulu' : 'Untitled article')}
+                  </h1>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 border border-[var(--border)] mt-6">
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{t.detail.articleSource}</div>
+                      <div className="gov-meta-value font-mono">{article.source ?? '—'}</div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Data' : 'Date'}</div>
+                      <div className="gov-meta-value tnum">
+                        {article.published_at
+                          ? formatDate(article.published_at, { day: '2-digit', month: 'short', year: 'numeric' })
+                          : '—'}
+                      </div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Status' : 'Status'}</div>
+                      <div className="gov-meta-value">
+                        <span
+                          className="px-2 py-1 border font-extrabold uppercase tracking-[0.1em] text-[10px]"
+                          style={{
+                            background: article.processed ? 'var(--risk-low-bg)' : 'var(--risk-medium-bg)',
+                            borderColor: article.processed ? 'var(--risk-low-rule)' : 'var(--risk-medium-rule)',
+                            color: article.processed ? 'var(--risk-low)' : 'var(--risk-medium)',
+                          }}
+                        >
+                          {article.processed
+                            ? locale === 'pl' ? 'Przetworzony' : 'Processed'
+                            : locale === 'pl' ? 'Nieprzetworzony' : 'Pending'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
 
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-            <section className="border border-[var(--border)] bg-[var(--surface)]">
+            <section className="gov-panel">
               <div className="px-5 sm:px-7 py-6 border-b border-[var(--rule)] flex items-center justify-between gap-4 flex-wrap">
                 <h2 className="section-title !mb-0 !pb-0 !border-0">
                   {locale === 'pl' ? 'Tresc artykulu' : 'Article text'}

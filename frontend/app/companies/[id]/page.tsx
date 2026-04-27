@@ -220,58 +220,66 @@ export default function CompanyDetailPage() {
 
       <LocaleFade>
         <main className="flex-1">
-          <section
-            className="bg-[var(--surface)] border-b border-[var(--border)]"
-          >
+          <section className="bg-[var(--surface)] border-b border-[var(--border)]">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-              <p className="eyebrow mb-2">
-                {locale === 'pl' ? 'Karta podmiotu' : 'Entity record'}
-                {' · '}#{company.id}
-              </p>
-              <div className="flex items-start gap-3">
-                <span
-                  className="mt-3 w-3 h-3 shrink-0"
-                  style={{ background: riskColor }}
-                  aria-hidden="true"
-                />
-                <h1 className="text-3xl sm:text-[36px] font-semibold tracking-tight text-[var(--ink)] leading-[1.1]">
-                  {company.name}
-                </h1>
-              </div>
-              <div className="flex items-center gap-x-5 gap-y-2 flex-wrap mt-3 ml-6 text-[12px]">
-                <span
-                  className="px-2 py-0.5 border font-semibold uppercase tracking-[0.1em] text-[10px]"
-                  style={{ background: riskBg, borderColor: riskRule, color: riskColor, borderRadius: '2px' }}
-                >
-                  {riskLabels[risk]}
-                </span>
-                {company.nip && (
-                  <span className="text-[var(--ink-muted)] tnum">
-                    <span className="font-semibold text-[var(--ink-2)]">{t.card.nip}</span>{' '}
-                    <span className="font-mono">{company.nip}</span>
-                  </span>
-                )}
-                {company.ticker_gpw && (
-                  <span className="text-[var(--ink-muted)] tnum">
-                    <span className="font-semibold text-[var(--ink-2)]">GPW:</span>{' '}
-                    <span className="font-mono">{company.ticker_gpw}</span>
-                  </span>
-                )}
-                <span className="text-[var(--ink-muted)]">
-                  <span className="font-semibold text-[var(--ink-2)]">{t.detail.addedOn}</span>{' '}
-                  <span className="tnum">{formattedDate}</span>
-                </span>
-                <button
-                  onClick={() => {
-                    const link = document.createElement('a');
-                    link.href = `/api/companies/${company.id}/export`;
-                    link.download = `risk_report_${company.id}.pdf`;
-                    link.click();
-                  }}
-                  className="ml-auto px-3 py-1 border border-[var(--border)] rounded text-[11px] font-semibold uppercase hover:bg-[var(--surface)] transition"
-                >
-                  📄 {locale === 'pl' ? 'Eksportuj' : 'Export'}
-                </button>
+              <div className="gov-panel">
+                <div className="gov-section-header">
+                  <span>{locale === 'pl' ? 'Karta podmiotu' : 'Entity record'} · #{company.id}</span>
+                  <span>{riskLabels[risk]}</span>
+                </div>
+                <div className="p-5 sm:p-7">
+                  <div className="flex items-start justify-between gap-5 flex-wrap">
+                    <div className="flex items-start gap-4 min-w-0">
+                      <span
+                        className="mt-1 w-3 h-14 shrink-0"
+                        style={{ background: riskColor }}
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0">
+                        <p className="eyebrow mb-2">
+                          {locale === 'pl' ? 'Profil w rejestrze ryzyka' : 'Risk registry profile'}
+                        </p>
+                        <h1 className="text-3xl sm:text-[40px] font-extrabold tracking-tight text-[var(--ink)] leading-[1.05]">
+                          {company.name}
+                        </h1>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = `/api/companies/${company.id}/export`;
+                        link.download = `risk_report_${company.id}.pdf`;
+                        link.click();
+                      }}
+                      className="doc-btn doc-btn--primary"
+                    >
+                      PDF {locale === 'pl' ? 'Eksportuj' : 'Export'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border border-[var(--border)] mt-6">
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Status ryzyka' : 'Risk status'}</div>
+                      <div className="gov-meta-value">
+                        <span className="px-2 py-1 border font-extrabold uppercase tracking-[0.1em] text-[10px]" style={{ background: riskBg, borderColor: riskRule, color: riskColor }}>
+                          {riskLabels[risk]}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{t.card.nip}</div>
+                      <div className="gov-meta-value font-mono tnum">{company.nip ?? '—'}</div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">GPW</div>
+                      <div className="gov-meta-value font-mono tnum">{company.ticker_gpw ?? '—'}</div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{t.detail.addedOn}</div>
+                      <div className="gov-meta-value tnum">{formattedDate}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -281,7 +289,7 @@ export default function CompanyDetailPage() {
 
             {company.sanctions?.is_sanctioned && (
               <section
-                className="p-6 border border-red-500 bg-red-50 rounded-lg"
+                className="p-6 border"
                 style={{
                   borderColor: 'var(--risk-high-rule)',
                   background: 'var(--risk-high-bg)',
@@ -305,7 +313,7 @@ export default function CompanyDetailPage() {
                       {company.sanctions.lists.map((list, idx) => (
                         <div
                           key={idx}
-                          className="flex items-center justify-between text-sm p-2 bg-white/50 rounded"
+                            className="flex items-center justify-between text-sm p-2 bg-[var(--surface)] border border-[var(--risk-high-rule)]"
                         >
                           <div>
                             <span className="font-semibold">{list.name}</span>
@@ -325,7 +333,7 @@ export default function CompanyDetailPage() {
             )}
 
             <section>
-              <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 border border-[var(--border)] bg-[var(--surface)]">
+              <div className="gov-panel grid grid-cols-1 lg:grid-cols-5 gap-0">
                 <div className="p-6 lg:col-span-2 lg:border-r border-b lg:border-b-0 border-[var(--border)]">
                   <p className="eyebrow mb-3">{t.detail.currentScore}</p>
                   <p

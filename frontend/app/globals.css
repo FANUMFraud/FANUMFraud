@@ -1,108 +1,103 @@
 @import "tailwindcss";
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Light theme (default) — institutional / official-document.
-   Warm paper background, deep navy ink, crimson used sparingly.
-   ──────────────────────────────────────────────────────────────────────────── */
+/* FANUM government registry visual system.
+   The interface intentionally reads as an official public register:
+   strict grids, square controls, high contrast, restrained color. */
 
 :root {
-  /* Surfaces */
-  --paper: #f6f4ee;
-  --paper-2: #efece4;
+  --paper: #f4f6f8;
+  --paper-2: #e7ebf0;
   --surface: #ffffff;
-  --surface-alt: #faf8f3;
+  --surface-alt: #f8fafc;
 
-  /* Borders / rules */
-  --rule: #e7e2d4;
-  --border: #d6d0bf;
-  --border-strong: #a8a08c;
+  --rule: #d8dee8;
+  --border: #b8c2cf;
+  --border-strong: #6c7a8a;
 
-  /* Ink (text) */
-  --ink: #1a1a1a;
-  --ink-2: #3f3f46;
-  --ink-muted: #6b6358;
-  --ink-faint: #8a8378;
+  --ink: #111827;
+  --ink-2: #243447;
+  --ink-muted: #526273;
+  --ink-faint: #7a8796;
 
-  /* Institutional accents */
-  --navy: #0c2340;
-  --navy-2: #1c3a5e;
-  --link: #0a3a6f;
-  --link-hover: #06264a;
+  --gov-blue: #003064;
+  --gov-blue-2: #064782;
+  --gov-blue-3: #dce8f5;
+  --navy: var(--gov-blue);
+  --navy-2: var(--gov-blue-2);
+  --link: #004b93;
+  --link-hover: #002f5f;
 
-  /* Crimson — used sparingly */
-  --crimson: #a51c2e;
-  --crimson-2: #861624;
-  --crimson-soft: #f5e4e6;
+  --crimson: #d5233f;
+  --crimson-2: #a9152d;
+  --crimson-soft: #f8dfe4;
 
-  /* Risk tones */
-  --risk-high: #a51c2e;
-  --risk-high-bg: #f7e7e9;
-  --risk-high-rule: #e6c0c4;
+  --risk-high: #b00020;
+  --risk-high-bg: #fff0f2;
+  --risk-high-rule: #e6a6b0;
   --risk-medium: #8a5a00;
-  --risk-medium-bg: #f7eed3;
-  --risk-medium-rule: #e3d29e;
-  --risk-low: #1f5e3a;
-  --risk-low-bg: #e3eee5;
-  --risk-low-rule: #b9d2bf;
+  --risk-medium-bg: #fff7db;
+  --risk-medium-rule: #dec071;
+  --risk-low: #0f6b3f;
+  --risk-low-bg: #e8f5ee;
+  --risk-low-rule: #9cc9af;
 
-  /* Misc */
-  --focus: #f5d142;
-  --input-focus-bg: #fffef5;
-  --skeleton-pulse: rgba(0, 0, 0, 0.04);
-  --texture: rgba(0, 0, 0, 0.014);
-  --grid-axis: rgba(0, 0, 0, 0.18);
-  --grid-line: rgba(0, 0, 0, 0.05);
+  --focus: #ffd400;
+  --input-focus-bg: #fffdf0;
+  --skeleton-pulse: rgba(0, 48, 100, 0.055);
+  --texture: rgba(0, 48, 100, 0.035);
+  --grid-axis: rgba(17, 24, 39, 0.45);
+  --grid-line: rgba(17, 24, 39, 0.10);
 
-  /* Brand mark — fixed across themes for identity consistency */
-  --brand-bg: #0c2340;
+  --brand-bg: var(--gov-blue);
   --brand-fg: #ffffff;
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
-   Dark theme — same institutional language, reversed.
-   Slate-navy paper, warm light ink, muted accents.
-   ──────────────────────────────────────────────────────────────────────────── */
-
 [data-theme="dark"] {
-  --paper: #0e1219;
-  --paper-2: #141a25;
-  --surface: #1a2030;
-  --surface-alt: #161c28;
+  --paper: #0b1220;
+  --paper-2: #101a2c;
+  --surface: #151f31;
+  --surface-alt: #111b2d;
 
-  --rule: #232a3a;
-  --border: #2d3548;
-  --border-strong: #515c75;
+  --rule: #26354d;
+  --border: #3a4a62;
+  --border-strong: #6f819c;
 
-  --ink: #e6e9f0;
-  --ink-2: #c5cad6;
-  --ink-muted: #8d94a6;
-  --ink-faint: #5b6379;
+  --ink: #eef4fb;
+  --ink-2: #d0dae8;
+  --ink-muted: #a1afc1;
+  --ink-faint: #748399;
 
-  --navy: #7fa9d6;
-  --navy-2: #a3c1de;
-  --link: #88b2dc;
-  --link-hover: #b9d3e9;
+  --gov-blue: #7eb6f0;
+  --gov-blue-2: #a8cff5;
+  --gov-blue-3: #142b47;
+  --navy: var(--gov-blue);
+  --navy-2: var(--gov-blue-2);
+  --link: #9ecbff;
+  --link-hover: #c7e1ff;
 
-  --crimson: #e87583;
-  --crimson-2: #f29ba6;
-  --crimson-soft: #2a1620;
+  --crimson: #ff6b80;
+  --crimson-2: #ff9aaa;
+  --crimson-soft: #351823;
 
-  --risk-high: #e87583;
-  --risk-high-bg: #2a1820;
-  --risk-high-rule: #4a2535;
-  --risk-medium: #d4a55a;
-  --risk-medium-bg: #2a2418;
-  --risk-medium-rule: #4a3f25;
-  --risk-low: #6dba8a;
-  --risk-low-bg: #182a20;
-  --risk-low-rule: #2a4a35;
+  --risk-high: #ff7a8f;
+  --risk-high-bg: #321923;
+  --risk-high-rule: #794052;
+  --risk-medium: #f0c36a;
+  --risk-medium-bg: #2d2515;
+  --risk-medium-rule: #7d6530;
+  --risk-low: #76d197;
+  --risk-low-bg: #14291d;
+  --risk-low-rule: #3c7952;
 
-  --focus: #f5d142;
-  --input-focus-bg: #1f2638;
-  --skeleton-pulse: rgba(255, 255, 255, 0.045);
-  --texture: rgba(255, 255, 255, 0.01);
-  --grid-axis: rgba(255, 255, 255, 0.12);
-  --grid-line: rgba(255, 255, 255, 0.04);
+  --focus: #ffd400;
+  --input-focus-bg: #1a2740;
+  --skeleton-pulse: rgba(255, 255, 255, 0.055);
+  --texture: rgba(255, 255, 255, 0.035);
+  --grid-axis: rgba(238, 244, 251, 0.30);
+  --grid-line: rgba(238, 244, 251, 0.08);
+
+  --brand-bg: #071021;
+  --brand-fg: #ffffff;
 }
 
 @theme inline {
@@ -112,67 +107,52 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Set color-scheme so native UI (scrollbars on Firefox, autofill, etc.) adapt */
 html { color-scheme: light; }
 [data-theme="dark"] { color-scheme: dark; }
 
 body {
-  background: var(--paper);
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, transparent 0, transparent 31px, var(--texture) 32px),
+    linear-gradient(0deg, transparent 0, transparent 31px, var(--texture) 32px),
+    var(--paper);
+  background-size: 32px 32px;
   color: var(--ink);
-  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-sans, Arial, Helvetica, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'tnum', 'cv11', 'ss01';
-  transition: background-color 240ms ease, color 240ms ease;
+  font-feature-settings: 'tnum';
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
-/* Subtle horizontal-line texture; rendered in either theme via --texture */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(
-    0deg,
-    var(--texture) 0px,
-    var(--texture) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.6;
-}
+body::before { display: none; }
 
-/* During theme toggle, smooth ALL surfaces. The class is removed after ~280ms. */
 .theme-transitioning,
 .theme-transitioning *,
 .theme-transitioning *::before,
 .theme-transitioning *::after {
   transition:
-    background-color 240ms ease,
-    border-color 240ms ease,
-    color 240ms ease,
-    fill 240ms ease,
-    stroke 240ms ease !important;
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    fill 180ms ease,
+    stroke 180ms ease !important;
   transition-delay: 0ms !important;
 }
 
 ::selection {
   background: var(--focus);
-  color: #1a1a1a;
+  color: #111827;
 }
 
-/* Scrollbar — minimal, document-like, theme-aware */
-::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar { width: 13px; height: 13px; }
 ::-webkit-scrollbar-track { background: var(--paper-2); }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: var(--border-strong);
   border: 3px solid var(--paper-2);
   border-radius: 0;
 }
-::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
-
-/* ───────────────────────── Focus rings (gov-style yellow) ───────────────── */
+::-webkit-scrollbar-thumb:hover { background: var(--ink-muted); }
 
 *:focus { outline: none; }
 a:focus-visible,
@@ -181,78 +161,118 @@ input:focus-visible,
 [role="button"]:focus-visible,
 [tabindex]:focus-visible {
   outline: 3px solid var(--focus);
-  outline-offset: 1px;
-  box-shadow: 0 0 0 1px var(--ink) inset;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #111827;
 }
 
-/* Default link styling — underlined, document-style */
 a {
   color: var(--link);
   text-decoration: underline;
   text-underline-offset: 2px;
   text-decoration-thickness: 1px;
-  text-decoration-color: color-mix(in srgb, var(--link) 40%, transparent);
-  transition: color 150ms ease, text-decoration-color 150ms ease;
 }
-a:hover { color: var(--link-hover); text-decoration-color: var(--link-hover); }
+a:hover { color: var(--link-hover); }
 a.no-underline { text-decoration: none; }
 
-/* ─────────────────────────────── Typography ─────────────────────────────── */
-
 .eyebrow {
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 800;
   color: var(--ink-muted);
 }
 
 .section-title {
-  font-size: 13px;
-  letter-spacing: 0.1em;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  background: var(--gov-blue);
+  color: #ffffff;
+  border: 1px solid var(--gov-blue);
+  font-size: 12px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 700;
-  color: var(--ink);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--ink);
-  margin-bottom: 20px;
+  font-weight: 800;
   line-height: 1.2;
+  margin-bottom: 16px;
 }
 
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* ───────────────────────────────── Tokens ───────────────────────────────── */
-
-.doc-card {
+.doc-card,
+.doc-card-alt,
+.gov-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 2px;
-  transition: border-color 180ms ease, background-color 180ms ease;
+  border-radius: 0;
+  box-shadow: 0 1px 0 rgba(17, 24, 39, 0.04);
 }
-.doc-card:hover { border-color: var(--border-strong); }
+
+.doc-card {
+  border-top: 4px solid var(--gov-blue);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+.doc-card:hover {
+  border-color: var(--border-strong);
+  border-top-color: var(--gov-blue-2);
+  box-shadow: 0 2px 0 rgba(17, 24, 39, 0.08);
+}
 
 .doc-card-alt {
   background: var(--surface-alt);
-  border: 1px solid var(--border);
-  border-radius: 2px;
 }
 
-.hr-rule { border: 0; border-top: 1px solid var(--rule); }
-.hr-strong { border: 0; border-top: 1px solid var(--ink); }
+.gov-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--gov-blue);
+  color: #ffffff;
+  border: 1px solid var(--gov-blue);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
-/* ────────────────────────────── Animations ──────────────────────────────── */
+.gov-meta-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.35fr) 1fr;
+  border-top: 1px solid var(--rule);
+}
+.gov-meta-row:first-child { border-top: 0; }
+.gov-meta-label,
+.gov-meta-value {
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.gov-meta-label {
+  background: var(--surface-alt);
+  color: var(--ink-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-right: 1px solid var(--rule);
+}
+.gov-meta-value { color: var(--ink); }
+
+.hr-rule { border: 0; border-top: 1px solid var(--border); }
+.hr-strong { border: 0; border-top: 2px solid var(--gov-blue); }
 
 @keyframes locale-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.locale-fade { animation: locale-fade 160ms ease both; }
+
+@keyframes row-in {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.locale-fade { animation: locale-fade 280ms ease both; }
-
-@keyframes row-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.row-in { animation: row-in 320ms ease both; }
+.row-in { animation: row-in 180ms ease both; }
 
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -266,21 +286,18 @@ a.no-underline { text-decoration: none; }
     var(--paper-2) 100%
   );
   background-size: 200% 100%;
-  animation: shimmer 1.6s ease-in-out infinite;
+  animation: shimmer 1.4s ease-in-out infinite;
   border: 1px solid var(--rule);
 }
-
-/* ───────────────────────── Pill switch (lang + theme) ───────────────────── */
 
 .pill-switch {
   position: relative;
   display: inline-flex;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--border-strong);
   background: var(--surface);
-  height: 30px;
+  height: 32px;
   padding: 0;
   overflow: hidden;
-  transition: border-color 180ms ease, background-color 180ms ease;
 }
 
 .pill-switch__indicator {
@@ -288,14 +305,11 @@ a.no-underline { text-decoration: none; }
   top: 0;
   left: 0;
   height: 100%;
-  background: var(--ink);
+  background: var(--gov-blue);
   transform: translateX(0);
-  transition:
-    transform 320ms cubic-bezier(0.65, 0.05, 0.35, 1),
-    background-color 240ms ease;
+  transition: transform 220ms ease, background-color 160ms ease;
   will-change: transform;
 }
-
 .pill-switch[data-active-index="1"] .pill-switch__indicator { transform: translateX(100%); }
 
 .pill-switch__btn {
@@ -306,24 +320,23 @@ a.no-underline { text-decoration: none; }
   justify-content: center;
   height: 100%;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   background: transparent;
   border: 0;
   cursor: pointer;
   color: var(--ink);
-  transition: color 240ms ease;
-  font-feature-settings: 'tnum';
+  transition: color 160ms ease;
 }
-.pill-switch__btn[aria-pressed="true"] { color: var(--surface); }
-.pill-switch__btn:hover[aria-pressed="false"] { color: var(--navy); }
+.pill-switch__btn[aria-pressed="true"] { color: #ffffff; }
+.pill-switch__btn:hover[aria-pressed="false"] { color: var(--link); }
 
 .lang-switch .pill-switch__btn,
-.lang-switch .pill-switch__indicator { width: 44px; }
+.lang-switch .pill-switch__indicator { width: 46px; }
 
 .theme-switch .pill-switch__btn,
-.theme-switch .pill-switch__indicator { width: 36px; }
+.theme-switch .pill-switch__indicator { width: 38px; }
 
 .theme-switch .pill-switch__btn svg {
   width: 14px;
@@ -331,48 +344,50 @@ a.no-underline { text-decoration: none; }
   stroke-width: 2;
 }
 
-/* ────────────────────────────── Inputs ──────────────────────────────────── */
-
-/* No horizontal padding shorthand here — let consumers control it via Tailwind
-   so utilities like `pl-10` (icon padding) actually take effect. */
 .doc-input {
   width: 100%;
-  height: 44px;
+  height: 48px;
   padding-block: 0;
   background: var(--surface);
-  border: 1px solid var(--ink);
+  border: 2px solid var(--border-strong);
   border-radius: 0;
   color: var(--ink);
   caret-color: var(--ink);
-  font-size: 14px;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  font-size: 15px;
+  font-weight: 500;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 .doc-input::placeholder { color: var(--ink-faint); }
-.doc-input:focus { background: var(--input-focus-bg); }
+.doc-input:focus { background: var(--input-focus-bg); border-color: var(--gov-blue); }
 
 .doc-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
   padding: 0 14px;
   background: var(--surface);
-  border: 1px solid var(--ink);
+  border: 1px solid var(--border-strong);
   color: var(--ink);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 800;
   letter-spacing: 0.04em;
   border-radius: 0;
   cursor: pointer;
-  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+  text-transform: uppercase;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
-.doc-btn:hover { background: var(--ink); color: var(--surface); }
-.doc-btn--primary { background: var(--ink); color: var(--surface); }
-.doc-btn--primary:hover { background: var(--surface); color: var(--ink); }
+.doc-btn:hover { background: var(--gov-blue); border-color: var(--gov-blue); color: #ffffff; }
+.doc-btn--primary { background: var(--gov-blue); border-color: var(--gov-blue); color: #ffffff; }
+.doc-btn--primary:hover { background: var(--surface); color: var(--gov-blue); }
 .doc-btn--danger { border-color: var(--crimson); color: var(--crimson); }
-.doc-btn--danger:hover { background: var(--crimson); color: var(--surface); }
+.doc-btn--danger:hover { background: var(--crimson); color: #ffffff; }
 
-/* ─── Reduced motion respect ──────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .gov-meta-row { grid-template-columns: 1fr; }
+  .gov-meta-label { border-right: 0; border-bottom: 1px solid var(--rule); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
