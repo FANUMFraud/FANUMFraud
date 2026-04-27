@@ -12,3 +12,9 @@ export function getRiskLevel(score: number): RiskLevel {
 export function scoreDrop(previousScore: number, currentScore: number): number {
   return Math.max(0, previousScore - currentScore);
 }
+
+export function formatScore(score: number): string {
+  if (!Number.isFinite(score)) return '—';
+  const rounded = Math.round(score * 10) / 10;
+  return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
+}

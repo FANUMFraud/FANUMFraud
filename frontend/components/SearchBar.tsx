@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { searchCompanies, type Company } from '@/lib/api';
-import { getRiskLevel } from '@/lib/risk';
+import { getRiskLevel, formatScore } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
 const riskTextClass = (score: number) => {
@@ -111,7 +111,7 @@ export default function SearchBar() {
                   )}
                 </div>
                 <span className={`font-semibold text-base tnum ${riskTextClass(company.current_score)}`}>
-                  {company.current_score}
+                  {formatScore(company.current_score)}
                 </span>
               </Link>
             ))

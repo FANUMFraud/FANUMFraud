@@ -5,7 +5,7 @@ import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
 from database import get_db
@@ -34,12 +34,15 @@ router = APIRouter(prefix="/companies", tags=["companies"])
 def list_companies(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
+    include_empty: bool = Query(False),
     db: Session = Depends(get_db),
 ):
-    # Return all companies ordered by current_score ascending (worst first)
+    query = db.query(Company)
+    if not include_empty:
+        has_history = exists().where(ScoreHistory.company_id == Company.id)
+        query = query.filter(has_history)
     return (
-        db.query(Company)
-        .order_by(Company.current_score.asc())
+        query.order_by(Company.current_score.asc())
         .offset(skip)
         .limit(limit)
         .all()
