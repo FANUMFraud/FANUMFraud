@@ -326,8 +326,18 @@ def main() -> None:
                     score_count += 1
 
             company.current_score = scorer.point_at(signals, as_of=_utc_now()).score
-            if score_points and config.risk_probability <= 0.02:
-                company.current_score = max(company.current_score, 82.0)
+            
+            # Apply minimum floor to ensure realistic scores:
+            # - Clean companies (no shock): min 82.0 (very stable reputation)
+            # - Shocked companies: min 8.0 (severe issues but not bottom)
+            # - This prevents accumulation of multiple high-risk signals from clamping to 0.0
+            if score_points:
+                if config.has_shock:
+                    # Shocked company: allow low scores but not zero
+                    company.current_score = max(company.current_score, 8.0)
+                elif config.risk_probability <= 0.02:
+                    # Clean company: ensure good reputation
+                    company.current_score = max(company.current_score, 82.0)
 
         db.commit()
         _index_companies(companies)
