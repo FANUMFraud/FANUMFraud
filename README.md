@@ -29,7 +29,8 @@ This project was built for the Transparent Data hackathon challenge:
 - Demo data:
   - Docker Compose runs `seed-demo` automatically,
   - seed creates 12 fictional companies, 1800 demo articles and score history points,
-  - seed is deterministic and safe to run multiple times.
+  - default seed is deterministic and safe to run multiple times,
+  - optional random seed mode can generate a fresh demo variant.
 
 ## Architecture
 
@@ -120,11 +121,39 @@ Frontend expects backend at `http://localhost:8000` by default (`NEXT_PUBLIC_API
 
 ## Rerun demo seed manually
 
+Stable default dataset:
+
 ```bash
 docker compose run --rm seed-demo
 ```
 
-The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts the same deterministic dataset again.
+Fresh random demo variant:
+
+```bash
+docker compose build seed-demo
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
+```
+
+If the database stack is fully stopped, start dependencies first:
+
+```bash
+docker compose up -d postgres elasticsearch
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random
+```
+
+Reproducible custom variant:
+
+```bash
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed 12345
+```
+
+Larger random dataset:
+
+```bash
+docker compose run --rm seed-demo python scripts/seed_demo.py --seed random --per-company 500
+```
+
+The seed is idempotent for generated demo articles: it removes previous generated demo articles/history and inserts a dataset for the selected seed.
 
 ## Useful manual pipeline commands
 

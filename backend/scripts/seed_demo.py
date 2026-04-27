@@ -5,23 +5,27 @@ import json
 import random
 import re
 import sys
+import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Sequence
 
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from database import SessionLocal, init_db
+from database import SessionLocal, engine, init_db
 from models import Article, Company, ScoreHistory
 from scorer import ReputationScorer, RiskSignal
 
 DEMO_URL_PREFIX = "https://demo.fanumfraud.local/articles"
 DEFAULT_ARTICLES_PER_COMPANY = 150
-RANDOM_SEED = 20260427
+DEFAULT_RANDOM_SEED = 20260427
 SOURCE_NAMES = [
     "money.pl",
     "bankier.pl",
@@ -204,8 +208,10 @@ DEMO_COMPANIES: list[DemoCompany] = [
 
 def main() -> None:
     args = _parse_args()
-    rng = random.Random(RANDOM_SEED)
+    seed_value, seed_mode = _resolve_seed(args.seed)
+    rng = random.Random(seed_value)
 
+    _wait_for_database(timeout_seconds=args.db_timeout)
     init_db()
     db = SessionLocal()
     try:
@@ -280,6 +286,8 @@ def main() -> None:
                     "articles": article_count,
                     "score_history_points": score_count,
                     "articles_per_company": args.per_company,
+                    "seed": seed_value,
+                    "seed_mode": seed_mode,
                 },
                 ensure_ascii=False,
             )
@@ -289,10 +297,43 @@ def main() -> None:
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Seed FANUMFraud with deterministic demo data.")
+    parser = argparse.ArgumentParser(description="Seed FANUMFraud with demo data.")
     parser.add_argument("--per-company", type=int, default=DEFAULT_ARTICLES_PER_COMPANY)
     parser.add_argument("--days", type=int, default=270)
+    parser.add_argument("--db-timeout", type=int, default=90)
+    parser.add_argument(
+        "--seed",
+        default=str(DEFAULT_RANDOM_SEED),
+        help="Stable integer seed or 'random' for a new demo variant on each run.",
+    )
     return parser.parse_args()
+
+
+def _wait_for_database(timeout_seconds: int) -> None:
+    deadline = time.monotonic() + max(timeout_seconds, 1)
+    last_error: Exception | None = None
+
+    while time.monotonic() < deadline:
+        try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+            return
+        except OperationalError as exc:
+            last_error = exc
+            time.sleep(2)
+
+    raise RuntimeError(f"Database is not ready after {timeout_seconds}s") from last_error
+
+
+def _resolve_seed(raw_seed: str) -> tuple[int, str]:
+    normalized = str(raw_seed).strip().lower()
+    if normalized in {"random", "rand", "auto"}:
+        return random.SystemRandom().randrange(1, 2**63), "random"
+
+    try:
+        return int(normalized), "stable"
+    except ValueError as exc:
+        raise SystemExit("--seed must be an integer or 'random'") from exc
 
 
 def _remove_existing_demo_articles(db) -> None:
