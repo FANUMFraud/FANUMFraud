@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { searchCompanies, type Company } from '@/lib/api';
 import Link from 'next/link';
+import { getRiskLevel } from '@/lib/risk';
 
 const getRiskColor = (score: number) => {
-  if (score >= 80) return 'text-red-400';
-  if (score >= 40) return 'text-yellow-400';
+  const riskLevel = getRiskLevel(score);
+  if (riskLevel === 'high') return 'text-red-400';
+  if (riskLevel === 'medium') return 'text-yellow-400';
   return 'text-emerald-400';
 };
 

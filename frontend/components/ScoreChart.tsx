@@ -11,32 +11,34 @@ import {
   ReferenceLine,
 } from 'recharts';
 import type { ScorePoint } from '@/lib/api';
+import { getRiskLevel } from '@/lib/risk';
+import { CATEGORY_META, normalizeCategory } from '@/lib/categories';
 
 interface Props {
   history: ScorePoint[];
 }
 
-const categoryLabels: Record<string, string> = {
-  korupcja: 'Korupcja',
-  zarzuty_karne: 'Zarzuty karne',
-  pranie_pieniedzy: 'Pranie pieniędzy',
-  oszustwo: 'Oszustwo',
-  sankcje: 'Sankcje',
-  neutralny: 'Neutralny',
+const getRiskColorClass = (score: number) => {
+  const riskLevel = getRiskLevel(score);
+  if (riskLevel === 'high') return 'text-red-400';
+  if (riskLevel === 'medium') return 'text-yellow-400';
+  return 'text-emerald-400';
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   const point: ScorePoint = payload[0].payload;
-  const cat = point.category ? (categoryLabels[point.category] ?? point.category) : null;
+  const normalizedCategory = normalizeCategory(point.category);
+  const cat = point.category ? CATEGORY_META[normalizedCategory].label : null;
+  const riskColor = getRiskColorClass(point.score);
 
   return (
     <div className="bg-[#161e2e] border border-white/10 rounded-xl p-4 shadow-2xl text-sm min-w-[160px]">
       <p className="text-gray-400 text-xs mb-2">{label}</p>
       <p className="text-white font-bold text-2xl">{point.score.toFixed(0)}</p>
       {cat && (
-        <p className="text-red-400 text-xs font-medium mt-2 uppercase tracking-wide">{cat}</p>
+        <p className={`${riskColor} text-xs font-medium mt-2 uppercase tracking-wide`}>{cat}</p>
       )}
     </div>
   );
@@ -76,8 +78,8 @@ export default function ScoreChart({ history }: Props) {
             tick={{ fill: '#6b7280', fontSize: 11 }}
             tickLine={false}
           />
-          <ReferenceLine y={80} stroke="rgba(239,68,68,0.25)" strokeDasharray="4 4" />
-          <ReferenceLine y={40} stroke="rgba(245,158,11,0.25)" strokeDasharray="4 4" />
+          <ReferenceLine y={75} stroke="rgba(245,158,11,0.25)" strokeDasharray="4 4" />
+          <ReferenceLine y={45} stroke="rgba(239,68,68,0.25)" strokeDasharray="4 4" />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.08)', strokeWidth: 1 }} />
           <Line
             type="monotone"

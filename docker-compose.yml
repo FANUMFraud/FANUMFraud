@@ -7,7 +7,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U fenumfraud"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       retries: 5
 
@@ -35,18 +35,10 @@ services:
       interval: 10s
       retries: 10
 
-  worker:
-    build: ./backend
-    command: celery -A workers.celery_app worker --concurrency=8 --loglevel=info
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     env_file: .env
     ports:

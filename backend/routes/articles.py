@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from analyzer import ArticleAnalyzer, ArticleInput
 from database import get_db
 from models import Article
 from schemas import (
@@ -16,19 +17,23 @@ from schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/articles", tags=["articles"])
+article_analyzer = ArticleAnalyzer()
 
 
 # POST /articles/analyze
 
 @router.post("/analyze", response_model=ArticleAnalyzeResponse)
-def analyze_article(payload: ArticleAnalyzeRequest, db: Session = Depends(get_db)):
+def analyze_article(payload: ArticleAnalyzeRequest):
     """
-    Run LLM sentiment/risk analysis on an article.
+    Run sentiment/risk analysis on an article.
 
-    Accepts either a URL (scrapes first) or raw content.
-    Delegates to core.analyzer written by the Algorithm team.
+    Accepts either a URL (scrapes first) or raw content and analyzes
+    with the local ArticleAnalyzer implementation.
     """
     content = payload.content
+    title = ""
+    source: str | None = None
+    published_at: datetime | None = None
 
     # If URL given but no content, scrape it
     if not content and payload.url:
@@ -42,6 +47,9 @@ def analyze_article(payload: ArticleAnalyzeRequest, db: Session = Depends(get_db
                     detail="Could not extract text from the provided URL",
                 )
             content = scraped["content"]
+            title = scraped.get("title") or ""
+            source = scraped.get("source")
+            published_at = scraped.get("published_at")
         except ImportError:
             raise HTTPException(
                 status_code=501,
@@ -54,27 +62,50 @@ def analyze_article(payload: ArticleAnalyzeRequest, db: Session = Depends(get_db
             detail="Either 'url' or 'content' must be provided",
         )
 
-    # Delegate to the algorithm team's analyzer
-    try:
-        from core.analyzer import analyze_article as run_analysis
+    candidate_companies = [payload.company_name.strip()] if payload.company_name.strip() else []
 
-        result = run_analysis(content, payload.company_name)
-    except ImportError:
-        raise HTTPException(
-            status_code=501,
-            detail="Core analyzer module not deployed yet",
+    try:
+        analysis = article_analyzer.analyze(
+            ArticleInput(
+                title=title,
+                content=content,
+                source=source,
+                url=payload.url,
+                published_at=published_at,
+                candidate_companies=candidate_companies,
+            )
         )
     except Exception:
         logger.exception("LLM analysis failed")
-        raise HTTPException(status_code=502, detail="LLM analysis error")
+        raise HTTPException(status_code=502, detail="Article analysis error")
+
+    category = _analysis_category(analysis)
+    context_weight = _context_weight(analysis.risk_level.value)
 
     return ArticleAnalyzeResponse(
-        ryzyko_score=result.get("ryzyko_score", 0.0),
-        pewnosc=result.get("pewnosc", 0.0),
-        kategoria=result.get("kategoria", "neutralny"),
-        waga_kontekstu=result.get("waga_kontekstu", "tlo"),
-        uzasadnienie=result.get("uzasadnienie", ""),
+        ryzyko_score=analysis.risk_score,
+        pewnosc=analysis.confidence,
+        kategoria=category,
+        waga_kontekstu=context_weight,
+        uzasadnienie=analysis.summary,
     )
+
+
+def _analysis_category(analysis) -> str:
+    if analysis.events:
+        first_category = analysis.events[0].category
+        return first_category.value if hasattr(first_category, "value") else str(first_category)
+    if analysis.risk_keywords:
+        return str(analysis.risk_keywords[0].category)
+    return analysis.risk_level.value
+
+
+def _context_weight(risk_level: str) -> str:
+    if risk_level in {"critical", "high"}:
+        return "wysoki"
+    if risk_level == "medium":
+        return "sredni"
+    return "niski"
 
 
 # GET /articles

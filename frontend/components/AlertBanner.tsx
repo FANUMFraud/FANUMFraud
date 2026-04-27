@@ -27,7 +27,7 @@ export default function AlertBanner({ show, scoreDelta }: Props) {
           Anomalia wykryta
         </p>
         <p className="text-red-300/80 text-sm mt-1 leading-relaxed">
-          Score firmy wzrósł o{' '}
+          Score firmy spadł o{' '}
           <span className="font-bold text-red-400">
             {scoreDelta != null ? `${scoreDelta.toFixed(0)} pkt` : 'ponad 20 pkt'}
           </span>{' '}

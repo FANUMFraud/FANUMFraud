@@ -47,7 +47,7 @@ class ArticleResponse(BaseModel):
     title: str | None
     source: str | None
     published_at: datetime | None
-    processed: int
+    processed: bool
     created_at: datetime
 
 

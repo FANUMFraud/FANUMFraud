@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { getCompanies, type Company } from '@/lib/api';
 import CompanyCard from '@/components/CompanyCard';
 import SearchBar from '@/components/SearchBar';
+import { getRiskLevel } from '@/lib/risk';
 
 type SortMode = 'risk_desc' | 'risk_asc' | 'name';
 
@@ -36,14 +37,14 @@ export default function DashboardPage() {
   }, []);
 
   const sorted = [...companies].sort((a, b) => {
-    if (sort === 'risk_desc') return b.current_score - a.current_score;
-    if (sort === 'risk_asc') return a.current_score - b.current_score;
+    if (sort === 'risk_desc') return a.current_score - b.current_score;
+    if (sort === 'risk_asc') return b.current_score - a.current_score;
     return a.name.localeCompare(b.name, 'pl');
   });
 
-  const highRisk = companies.filter((c) => c.current_score >= 80).length;
-  const medRisk = companies.filter((c) => c.current_score >= 40 && c.current_score < 80).length;
-  const lowRisk = companies.filter((c) => c.current_score < 40).length;
+  const highRisk = companies.filter((c) => getRiskLevel(c.current_score) === 'high').length;
+  const medRisk = companies.filter((c) => getRiskLevel(c.current_score) === 'medium').length;
+  const lowRisk = companies.filter((c) => getRiskLevel(c.current_score) === 'low').length;
 
   return (
     <div className="min-h-screen bg-[#080b12] text-white">

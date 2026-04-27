@@ -22,7 +22,7 @@ export interface ScorePoint {
   score: number;
   risk_score?: number;
   recorded_at: string;
-  category: string;
+  category?: string | null;
 }
 
 export interface CompanyScoreResponse {
@@ -50,6 +50,12 @@ export const getCompanyScore = (id: number): Promise<CompanyScoreResponse> =>
 
 export const getCompanyDetail = (id: number): Promise<Company> =>
   api.get<Company>(`/companies/${id}`).then((r) => r.data);
+
+export const getCompanyArticles = (
+  id: number,
+  params?: { days?: number; limit?: number }
+): Promise<Article[]> =>
+  api.get<Article[]>(`/companies/${id}/articles`, { params }).then((r) => r.data);
 
 export const searchCompanies = (q: string): Promise<Company[]> =>
   api.get<Company[]>(`/companies/search`, { params: { q } }).then((r) => r.data);

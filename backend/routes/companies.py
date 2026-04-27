@@ -2,15 +2,17 @@
 
 import json
 import logging
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import desc
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from database import get_db
 from elastic import index_company, search_companies
-from models import Company, ScoreHistory
+from models import Article, Company, ScoreHistory
 from schemas import (
+    ArticleResponse,
     CompanyCreate,
     CompanyResponse,
     CompanyScoreResponse,
@@ -93,8 +95,6 @@ def get_company_score(
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
 
-    from datetime import datetime, timedelta
-
     cutoff = datetime.utcnow() - timedelta(days=days)
     history = (
         db.query(ScoreHistory)
@@ -110,6 +110,39 @@ def get_company_score(
         company_id=company.id,
         current_score=company.current_score,
         history=[ScorePoint.model_validate(h) for h in history],
+    )
+
+
+# GET /companies/{company_id}/articles
+
+@router.get("/{company_id}/articles", response_model=list[ArticleResponse])
+def get_company_articles(
+    company_id: int,
+    days: int = Query(90, ge=1, le=365),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    company = db.query(Company).get(company_id)
+    if company is None:
+        raise HTTPException(status_code=404, detail="Company not found")
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    article_ids_stmt = (
+        select(ScoreHistory.article_id)
+        .where(
+            ScoreHistory.company_id == company_id,
+            ScoreHistory.article_id.is_not(None),
+            ScoreHistory.recorded_at >= cutoff,
+        )
+        .distinct()
+    )
+
+    return (
+        db.query(Article)
+        .filter(Article.id.in_(article_ids_stmt))
+        .order_by(Article.published_at.desc(), Article.id.desc())
+        .limit(limit)
+        .all()
     )
 
 

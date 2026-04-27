@@ -1,15 +1,10 @@
 import Link from 'next/link';
 import type { Company } from '@/lib/api';
+import { getRiskLevel } from '@/lib/risk';
 
 interface Props {
   company: Company;
   animationDelay?: number;
-}
-
-export function getRiskLevel(score: number): 'high' | 'medium' | 'low' {
-  if (score >= 80) return 'high';
-  if (score >= 40) return 'medium';
-  return 'low';
 }
 
 const riskConfig = {
@@ -75,7 +70,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
         {/* Score */}
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Risk Score</p>
+            <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">Scoring reputacji</p>
             <p className={`text-5xl font-black tabular-nums ${cfg.scoreColor}`}>
               {company.current_score}
               <span className="text-2xl font-semibold text-gray-600">/100</span>

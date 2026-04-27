@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getCompanyDetail, getCompanyScore, getArticles, type Company, type CompanyScoreResponse, type Article, type ScorePoint } from '@/lib/api';
+import { getCompanyDetail, getCompanyScore, getCompanyArticles, type Company, type CompanyScoreResponse, type Article, type ScorePoint } from '@/lib/api';
 import ScoreChart from '@/components/ScoreChart';
 import AlertBanner from '@/components/AlertBanner';
 import Link from 'next/link';
+import { getRiskLevel, scoreDrop } from '@/lib/risk';
+import { CATEGORY_META, CATEGORY_ORDER, normalizeCategory, type CanonicalCategory } from '@/lib/categories';
 
 export default function CompanyDetailPage() {
   const params = useParams();
@@ -17,12 +19,6 @@ export default function CompanyDetailPage() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const getRiskLevel = (score: number): 'high' | 'medium' | 'low' => {
-    if (score >= 80) return 'high';
-    if (score >= 40) return 'medium';
-    return 'low';
-  };
 
   const riskConfig = {
     high: {
@@ -42,7 +38,7 @@ export default function CompanyDetailPage() {
     },
   };
 
-  // Check if score dropped significantly in last 7 days
+  // Check if score dropped significantly in last 7 days.
   const checkScoreDelta = (history: ScorePoint[] | undefined): { show: boolean; delta?: number } => {
     if (!history || history.length < 2) return { show: false };
 
@@ -55,8 +51,8 @@ export default function CompanyDetailPage() {
 
     if (!oldestInRange || !newest) return { show: false };
 
-    const delta = newest.score - oldestInRange.score;
-    return { show: delta > 20, delta };
+    const drop = scoreDrop(oldestInRange.score, newest.score);
+    return { show: drop > 20, delta: drop };
   };
 
   useEffect(() => {
@@ -68,7 +64,7 @@ export default function CompanyDetailPage() {
         const [companyData, scoreResp, articlesData] = await Promise.all([
           getCompanyDetail(Number(id)),
           getCompanyScore(Number(id)),
-          getArticles(),
+          getCompanyArticles(Number(id), { days: 180, limit: 20 }),
         ]);
 
         setCompany(companyData);
@@ -141,6 +137,20 @@ export default function CompanyDetailPage() {
   const risk = getRiskLevel(company.current_score);
   const cfg = riskConfig[risk];
   const { show: showAlert, delta: scoreDelta } = checkScoreDelta(scoreData.history);
+  const categoryCounts = scoreData.history.reduce((acc, point) => {
+    const category = normalizeCategory(point.category);
+    acc[category] = (acc[category] ?? 0) + 1;
+    return acc;
+  }, {} as Record<CanonicalCategory, number>);
+
+  const categoryCards = CATEGORY_ORDER
+    .map((category) => ({
+      id: category,
+      label: CATEGORY_META[category].label,
+      cardClass: CATEGORY_META[category].cardClass,
+      count: categoryCounts[category] ?? 0,
+    }))
+    .filter((category) => category.count > 0);
 
   const formattedDate = new Date(company.created_at).toLocaleDateString('pl-PL', {
     day: '2-digit',
@@ -200,7 +210,7 @@ export default function CompanyDetailPage() {
                 />
               </div>
               <div className="text-xs text-gray-600">
-                {company.current_score >= 80 ? '🔴 Ekspozycja wysoka' : company.current_score >= 40 ? '🟡 Ekspozycja średnia' : '🟢 Ekspozycja niska'}
+                {risk === 'high' ? '🔴 Ekspozycja wysoka' : risk === 'medium' ? '🟡 Ekspozycja średnia' : '🟢 Ekspozycja niska'}
               </div>
             </div>
 
@@ -243,31 +253,27 @@ export default function CompanyDetailPage() {
         {scoreData.history.length > 0 && (
           <section className="space-y-4">
             <h2 className="text-xl font-bold">Kategorie ryzyka</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[
-                { name: 'Korupcja', id: 'korupcja', color: 'bg-red-500/8 border-red-500/20 text-red-400' },
-                { name: 'Zarzuty karne', id: 'zarzuty_karne', color: 'bg-orange-500/8 border-orange-500/20 text-orange-400' },
-                { name: 'Pranie pieniędzy', id: 'pranie_pieniedzy', color: 'bg-yellow-500/8 border-yellow-500/20 text-yellow-400' },
-                { name: 'Oszustwo', id: 'oszustwo', color: 'bg-pink-500/8 border-pink-500/20 text-pink-400' },
-                { name: 'Sankcje', id: 'sankcje', color: 'bg-purple-500/8 border-purple-500/20 text-purple-400' },
-                { name: 'Neutralny', id: 'neutralny', color: 'bg-emerald-500/8 border-emerald-500/20 text-emerald-400' },
-              ].map((cat) => {
-                const count = scoreData.history.filter((p) => p.category === cat.id).length;
-                return (
-                  <div key={cat.id} className={`rounded-2xl border p-4 ${cat.color}`}>
-                    <p className="text-sm font-semibold">{cat.name}</p>
-                    <p className="text-2xl font-bold mt-2">{count}</p>
+            {categoryCards.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categoryCards.map((category) => (
+                  <div key={category.id} className={`rounded-2xl border p-4 ${category.cardClass}`}>
+                    <p className="text-sm font-semibold">{category.label}</p>
+                    <p className="text-2xl font-bold mt-2">{category.count}</p>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/8 bg-[#0f1521] p-4 text-sm text-gray-500">
+                Brak przypisanych kategorii dla dostępnych pomiarów.
+              </div>
+            )}
           </section>
         )}
 
         {/* Articles */}
         {articles.length > 0 && (
           <section className="space-y-4">
-            <h2 className="text-xl font-bold">Artykuły medialne</h2>
+            <h2 className="text-xl font-bold">Artykuły powiązane z firmą</h2>
             <div className="grid grid-cols-1 gap-3">
               {articles.slice(0, 5).map((article) => (
                 <a
