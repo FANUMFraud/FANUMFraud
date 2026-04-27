@@ -81,7 +81,7 @@ def analyze_article(payload: ArticleAnalyzeRequest, db: Session = Depends(get_db
 
 @router.get("", response_model=list[ArticleResponse])
 def list_articles(
-    processed: int | None = Query(None, ge=0, le=1),
+    processed: bool | None = None,
     source: str | None = None,
     date_from: datetime | None = None,
     date_to: datetime | None = None,
