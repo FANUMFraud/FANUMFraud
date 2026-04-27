@@ -28,6 +28,43 @@ DEFAULT_BATCH_SIZE = 50
 DEFAULT_HALF_LIFE_DAYS = 45.0
 FUZZY_MATCH_THRESHOLD = 86.0
 MIN_TEXT_MATCH_LENGTH = 5
+OFFICIAL_SOURCE_WEIGHT = 1.35
+BUSINESS_SOURCE_WEIGHT = 1.08
+LOCAL_SOURCE_WEIGHT = 0.88
+UNKNOWN_SOURCE_WEIGHT = 0.72
+
+OFFICIAL_SOURCE_PATTERNS = (
+    "knf",
+    "uokik",
+    "gov.pl",
+    "prokuratura",
+    "policja",
+    "police",
+    "sad",
+    "court",
+    "ofac",
+    "europa.eu",
+)
+BUSINESS_SOURCE_PATTERNS = (
+    "money.pl",
+    "bankier.pl",
+    "businessinsider",
+    "pb.pl",
+    "parkiet",
+    "rp.pl",
+    "reuters",
+    "bloomberg",
+    "ft.com",
+)
+LOCAL_SOURCE_PATTERNS = (
+    "local",
+    "blog",
+    "forum",
+    "social",
+    "twitter",
+    "x.com",
+    "facebook",
+)
 
 _ANALYZER = ArticleAnalyzer()
 
@@ -35,6 +72,25 @@ _ANALYZER = ArticleAnalyzer()
 def _clamp(value: float, minimum: float, maximum: float) -> float:
     """Clamp value between minimum and maximum bounds."""
     return max(minimum, min(maximum, value))
+
+
+def _source_credibility(source: str | None) -> tuple[float, str]:
+    """
+    Weight source credibility before risk aggregation.
+
+    Official/regulatory sources have stronger evidentiary value than unknown
+    outlets, while reputable business media sit close to baseline.
+    """
+    normalized = _normalize_name(source or "")
+    if not normalized:
+        return UNKNOWN_SOURCE_WEIGHT, "unknown"
+    if any(pattern in normalized for pattern in OFFICIAL_SOURCE_PATTERNS):
+        return OFFICIAL_SOURCE_WEIGHT, "official"
+    if any(pattern in normalized for pattern in BUSINESS_SOURCE_PATTERNS):
+        return BUSINESS_SOURCE_WEIGHT, "business"
+    if any(pattern in normalized for pattern in LOCAL_SOURCE_PATTERNS):
+        return LOCAL_SOURCE_WEIGHT, "local"
+    return 1.0, "standard"
 
 
 @dataclass(frozen=True)
@@ -148,9 +204,14 @@ def _analyze_article(article: Article, candidate_companies: list[str]) -> Articl
 def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal:
     timestamp = article.published_at or datetime.now(UTC)
     sentiment = analysis.sentiment.value if hasattr(analysis.sentiment, "value") else str(analysis.sentiment)
+    source_weight, source_tier = _source_credibility(article.source)
     
     # Extract denial_recency from events if present
-    metadata = {}
+    metadata = {
+        "source": article.source,
+        "source_tier": source_tier,
+        "source_weight": source_weight,
+    }
     if analysis.events:
         first_event = analysis.events[0]
         if first_event.certainty and hasattr(first_event.certainty, "value"):
@@ -170,7 +231,7 @@ def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal
         risk_score=analysis.risk_score,
         confidence=analysis.confidence,
         sentiment=sentiment,
-        source_weight=1.0,
+        source_weight=source_weight,
         article_id=article.id,
         metadata=metadata,
     )

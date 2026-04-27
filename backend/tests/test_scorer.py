@@ -60,3 +60,27 @@ def test_future_signals_do_not_affect_historical_snapshot() -> None:
     assert historical.score == baseline.score
     assert historical.signal_count == 1
     assert future_view.signal_count == 2
+
+
+def test_source_weight_changes_signal_impact() -> None:
+    scorer = ReputationScorer(half_life_days=20)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    low_credibility = RiskSignal(
+        timestamp=now,
+        risk_score=50,
+        confidence=1.0,
+        sentiment="negative",
+        source_weight=0.7,
+    )
+    official_source = RiskSignal(
+        timestamp=now,
+        risk_score=50,
+        confidence=1.0,
+        sentiment="negative",
+        source_weight=1.35,
+    )
+
+    low_score = scorer.score_at([low_credibility], as_of=now)
+    official_score = scorer.score_at([official_source], as_of=now)
+
+    assert official_score < low_score
