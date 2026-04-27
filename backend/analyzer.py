@@ -178,6 +178,7 @@ class RiskEvent(BaseModel):
     certainty: EventCertainty = EventCertainty.alleged
     companies: list[str] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
+    denial_date: datetime | None = None  # When company denied the allegations
 
     model_config = ConfigDict(str_strip_whitespace=True)
 

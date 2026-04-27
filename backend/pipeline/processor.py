@@ -7,7 +7,7 @@ import unicodedata
 from contextlib import contextmanager
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Iterable
 
 from sqlalchemy.orm import Session
@@ -30,6 +30,11 @@ FUZZY_MATCH_THRESHOLD = 86.0
 MIN_TEXT_MATCH_LENGTH = 5
 
 _ANALYZER = ArticleAnalyzer()
+
+
+def _clamp(value: float, minimum: float, maximum: float) -> float:
+    """Clamp value between minimum and maximum bounds."""
+    return max(minimum, min(maximum, value))
 
 
 @dataclass(frozen=True)
@@ -96,7 +101,9 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
                 category = _pick_category(analysis)
 
                 for company_id in matched_company_ids:
-                    new_score = _compute_company_score(db, scorer, company_id, signal)
+                    new_score = _compute_company_score(
+                        db, scorer, company_id, signal, article.published_at
+                    )
                     db.add(
                         ScoreHistory(
                             company_id=company_id,
@@ -141,6 +148,23 @@ def _analyze_article(article: Article, candidate_companies: list[str]) -> Articl
 def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal:
     timestamp = article.published_at or datetime.now(UTC)
     sentiment = analysis.sentiment.value if hasattr(analysis.sentiment, "value") else str(analysis.sentiment)
+    
+    # Extract denial_recency from events if present
+    metadata = {}
+    if analysis.events:
+        first_event = analysis.events[0]
+        if first_event.certainty and hasattr(first_event.certainty, "value"):
+            metadata["certainty"] = first_event.certainty.value
+        else:
+            metadata["certainty"] = str(first_event.certainty)
+        
+        # Calculate denial recency (days since denial) if denial_date exists
+        if first_event.denial_date:
+            now = datetime.now(UTC)
+            denial_date = first_event.denial_date if first_event.denial_date.tzinfo else first_event.denial_date.replace(tzinfo=UTC)
+            denial_days = (now - denial_date).total_seconds() / 86_400.0
+            metadata["denial_recency_days"] = max(0.0, denial_days)  # No negative days
+    
     return RiskSignal(
         timestamp=timestamp,
         risk_score=analysis.risk_score,
@@ -148,6 +172,7 @@ def _build_signal(analysis: ArticleRiskAnalysis, article: Article) -> RiskSignal
         sentiment=sentiment,
         source_weight=1.0,
         article_id=article.id,
+        metadata=metadata,
     )
 
 
@@ -161,12 +186,56 @@ def _pick_category(analysis: ArticleRiskAnalysis) -> str | None:
     return None
 
 
+def _calculate_burst_multiplier(
+    db: Session,
+    company_id: int,
+    article_published_at: datetime,
+    burst_window_days: int = 7,
+    burst_threshold: int = 5,
+    burst_multiplier_max: float = 1.2,
+) -> float:
+    """
+    Detect if this article is part of a media burst (many articles in short time).
+    
+    Burst multiplier logic:
+    - 1-5 articles in 7 days: 1.0 - 1.2 progressive multiplier
+    - 5+ articles: 1.2 (capped)
+    
+    This detects coordinated media campaigns or smear campaigns.
+    """
+    cutoff_date = article_published_at - timedelta(days=burst_window_days)
+    
+    # Count articles for this company in the burst window
+    recent_articles_count = (
+        db.query(ScoreHistory)
+        .filter(
+            ScoreHistory.company_id == company_id,
+            ScoreHistory.recorded_at >= cutoff_date,
+        )
+        .count()
+    )
+    
+    if recent_articles_count < burst_threshold:
+        # No burst: linear scale from 1.0 to 1.2
+        multiplier = 1.0 + (burst_multiplier_max - 1.0) * (recent_articles_count / burst_threshold)
+    else:
+        # Burst detected: use maximum multiplier
+        multiplier = burst_multiplier_max
+    
+    return multiplier
+
+
 def _compute_company_score(
     db: Session,
     scorer: ReputationScorer,
     company_id: int,
     new_signal: RiskSignal,
+    article_published_at: datetime | None = None,
 ) -> float:
+    """
+    Compute company reputation score after adding new signal.
+    Applies burst detection multiplier if article timestamp provided.
+    """
     rows = (
         db.query(ScoreHistory)
         .filter(ScoreHistory.company_id == company_id)
@@ -176,7 +245,17 @@ def _compute_company_score(
 
     historical_signals = [_signal_from_history(row) for row in rows]
     point = scorer.point_at([*historical_signals, new_signal], as_of=new_signal.timestamp)
-    return point.score
+    base_score = point.score
+    
+    # Apply burst multiplier: increases score impact if many articles in short time
+    if article_published_at:
+        burst_mult = _calculate_burst_multiplier(db, company_id, article_published_at)
+        # Transform score towards higher risk (lower score) if burst detected
+        # Example: burst_mult=1.2 means 20% increase in risk, so reduce score
+        adjusted_score = 100.0 - ((100.0 - base_score) * burst_mult)
+        return _clamp(adjusted_score, 0.0, 100.0)
+    
+    return base_score
 
 
 def _signal_from_history(row: ScoreHistory) -> RiskSignal:
