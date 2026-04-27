@@ -1,25 +1,94 @@
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+import logging
 import os
+from typing import Generator
 
-DATABASE_URL = (
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, Session
+from sqlalchemy.exc import OperationalError
+from dotenv import load_dotenv
+
+# Konfiguracja loggingu
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Wczytanie zmiennych środowiskowych
+load_dotenv()
+
+# Konstrukcja URL bazy danych
+DATABASE_URL: str = (
     f"postgresql://{os.getenv('POSTGRES_USER')}:{os.getenv('POSTGRES_PASSWORD')}"
     f"@{os.getenv('POSTGRES_HOST')}:{os.getenv('POSTGRES_PORT')}/{os.getenv('POSTGRES_DB')}"
 )
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(bind=engine)
+# Tworzenie engine i SessionLocal
+engine = create_engine(DATABASE_URL, echo=False)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 class Base(DeclarativeBase):
+    """Bazowa klasa dla wszystkich modeli SQLAlchemy."""
+
     pass
 
-def init_db():
-    from models import Article, Company, ScoreHistory
-    Base.metadata.create_all(bind=engine)
 
-def get_db():
+def init_db() -> None:
+    """
+    Inicjalizacja bazy danych - tworzenie wszystkich tabel.
+    W przypadku błędu połączenia loguje informację ale nie przerywa aplikacji.
+    """
+    try:
+        # Import modeli - musi być tutaj żeby były zarejestrowane w Base.metadata
+        import models  # noqa: F401
+
+        logger.info("Tworzenie tabel w bazie danych...")
+        Base.metadata.create_all(bind=engine)
+        logger.info("✓ Baza danych zainicjalizowana pomyślnie")
+
+    except OperationalError as e:
+        logger.error(
+            f"✗ Błąd połączenia z bazą danych PostgreSQL: {e}. "
+            "Aplikacja będzie działać bez bazy danych do czasu przywrócenia połączenia."
+        )
+    except Exception as e:
+        logger.error(
+            f"✗ Nieoczekiwany błąd podczas inicjalizacji bazy danych: {e}. "
+            "Aplikacja będzie działać bez bazy danych do czasu przywrócenia połączenia."
+        )
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Generator dostarczający sesję bazy danych dla FastAPI dependency injection.
+
+    Yields:
+        Session: Sesja SQLAlchemy
+
+    Example:
+        @app.get("/items")
+        def get_items(db: Session = Depends(get_db)):
+            return db.query(Item).all()
+    """
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+def check_database_connection() -> bool:
+    """
+    Sprawdza połączenie z bazą danych.
+
+    Returns:
+        bool: True jeśli połączenie OK, False w przeciwnym wypadku
+    """
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return True
+    except OperationalError:
+        logger.warning("✗ Nie można połączyć się z bazą danych")
+        return False
+    except Exception as e:
+        logger.warning(f"✗ Błąd przy sprawdzaniu bazy danych: {e}")
+        return False
