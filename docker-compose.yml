@@ -42,7 +42,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    command: python scripts/seed_demo.py --per-company 150
+    command: python scripts/seed_demo.py --per-company 150 --seed ${DEMO_SEED:-random}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-fanumfraud}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanumfraud}
