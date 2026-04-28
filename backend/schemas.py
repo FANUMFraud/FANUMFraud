@@ -19,6 +19,12 @@ class CompanyCreate(BaseModel):
     aliases: list[str] = Field(default_factory=list)
 
 
+class LiveCompanySearchRequest(BaseModel):
+    query: str = Field(..., min_length=2, max_length=180)
+    limit: int = Field(default=12, ge=1, le=25)
+    force_refresh: bool = False
+
+
 class StockPriceData(BaseModel):
     """Dane giełdowe dla firmy"""
     model_config = ConfigDict(from_attributes=True)
@@ -41,9 +47,12 @@ class RiskMomentum(BaseModel):
 
 class SanctionsCheck(BaseModel):
     is_sanctioned: bool
+    status: str = "unknown"
+    available: bool = True
     lists: list[dict[str, Any]] = Field(default_factory=list)
     confidence: float = 0.0
     source: str = "unknown"
+    reason: str | None = None
 
 
 class CompanyResponse(BaseModel):
@@ -64,6 +73,18 @@ class CompanyResponse(BaseModel):
     @classmethod
     def _round_current_score(cls, value: float | int | None) -> float:
         return _round_score(value)
+
+
+class LiveCompanySearchResponse(BaseModel):
+    query: str
+    company_id: int
+    created: bool
+    articles_found: int
+    articles_saved: int
+    articles_scored: int
+    articles_skipped: int
+    status: str
+    company: CompanyResponse
 
 
 class ScorePoint(BaseModel):

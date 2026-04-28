@@ -287,6 +287,36 @@ export default function CompanyDetailPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
             {showAlert && <AlertBanner show={true} scoreDelta={scoreDelta} />}
 
+            {company.sanctions?.status === 'unavailable' && (
+              <section
+                className="p-6 border"
+                style={{
+                  borderColor: 'var(--risk-medium-rule)',
+                  background: 'var(--risk-medium-bg)',
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl" aria-hidden="true">!</span>
+                  <div className="flex-1">
+                    <h3
+                      className="font-extrabold text-lg mb-2 uppercase tracking-[0.04em]"
+                      style={{ color: 'var(--risk-medium)' }}
+                    >
+                      {locale === 'pl' ? 'NIE SPRAWDZONO LIST SANKCYJNYCH' : 'SANCTIONS CHECK NOT COMPLETED'}
+                    </h3>
+                    <p className="text-sm text-[var(--ink-2)] mb-2">
+                      {locale === 'pl'
+                        ? 'Brak wpisu nie został potwierdzony, ponieważ zewnętrzne źródło sankcyjne jest niedostępne lub nie skonfigurowano klucza API.'
+                        : 'A clear result has not been confirmed because the external sanctions source is unavailable or the API key is not configured.'}
+                    </p>
+                    <p className="text-[12px] text-[var(--ink-muted)] font-mono tnum">
+                      source={company.sanctions.source}{company.sanctions.reason ? ` · ${company.sanctions.reason}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
             {company.sanctions?.is_sanctioned && (
               <section
                 className="p-6 border"
@@ -308,6 +338,9 @@ export default function CompanyDetailPage() {
                       {locale === 'pl'
                         ? `Ta firma występuje na ${company.sanctions.lists.length} liście(ach) sankcji międzynarodowych.`
                         : `This company appears on ${company.sanctions.lists.length} international sanctions list(s).`}
+                    </p>
+                    <p className="text-[12px] text-[var(--ink-muted)] font-mono tnum mb-3">
+                      source={company.sanctions.source} · confidence={(company.sanctions.confidence * 100).toFixed(0)}%
                     </p>
                     <div className="space-y-2">
                       {company.sanctions.lists.map((list, idx) => (

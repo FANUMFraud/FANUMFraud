@@ -13,6 +13,7 @@ from database import get_db
 from elastic import index_company, search_companies
 from models import Article, Company, ScoreHistory
 from pipeline.company_registry import sync_companies_from_registry
+from pipeline.live_search import run_live_company_search
 from pipeline.watchlist import ensure_watchlist_companies
 from reports import generate_risk_report
 from sanctions import check_sanctions
@@ -20,6 +21,8 @@ from schemas import (
     ArticleResponse,
     CompanyCreate,
     CompanyResponse,
+    LiveCompanySearchRequest,
+    LiveCompanySearchResponse,
     CompanySyncResponse,
     CompanyScoreResponse,
     RiskMomentum,
@@ -82,6 +85,34 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
             }
             for r in rows
         ]
+
+
+@router.post("/search/live", response_model=LiveCompanySearchResponse)
+def live_company_search(
+    payload: LiveCompanySearchRequest,
+    db: Session = Depends(get_db),
+):
+    """Run ad-hoc online due-diligence search for a user-provided company."""
+    try:
+        stats = run_live_company_search(
+            payload.query,
+            limit=payload.limit,
+            force_refresh=payload.force_refresh,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Live company search failed for query=%r", payload.query)
+        raise HTTPException(status_code=502, detail="Live company search failed") from exc
+
+    company = db.query(Company).get(stats.get("company_id"))
+    if company is None:
+        raise HTTPException(status_code=500, detail="Live search company not found")
+
+    return LiveCompanySearchResponse(
+        **stats,
+        company=_company_response(company, db),
+    )
 
 
 @router.post("/sync/online", response_model=CompanySyncResponse)

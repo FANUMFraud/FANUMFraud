@@ -31,6 +31,22 @@ const riskTone = {
   },
 } as const;
 
+const sanctionsStyle = {
+  listed: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  clear: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  unavailable: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+} as const;
+
+function getSanctionsView(company: Company, locale: string) {
+  if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
+    return { label: locale === 'pl' ? 'Sankcje: na liście' : 'Sanctions: listed', className: sanctionsStyle.listed };
+  }
+  if (company.sanctions?.status === 'clear' || company.sanctions?.available === true) {
+    return { label: locale === 'pl' ? 'Sankcje: brak wpisu' : 'Sanctions: clear', className: sanctionsStyle.clear };
+  }
+  return { label: locale === 'pl' ? 'Sankcje: nie sprawdzono' : 'Sanctions: not checked', className: sanctionsStyle.unavailable };
+}
+
 export default function CompanyCard({ company, animationDelay = 0 }: Props) {
   const { t, locale } = useI18n();
   const risk = getRiskLevel(company.current_score);
@@ -48,6 +64,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
     medium: t.card.riskMedium,
     low: t.card.riskLow,
   } as const;
+  const sanctions = getSanctionsView(company, locale);
 
   return (
     <Link
@@ -74,12 +91,17 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
               </div>
             </div>
           </div>
-          <span
-            className={`shrink-0 text-[10px] uppercase tracking-[0.12em] font-extrabold px-2 py-1 border ${tone.badge}`}
-            style={{ borderRadius: 0 }}
-          >
-            {labels[risk]}
-          </span>
+          <div className="shrink-0 flex flex-col items-end gap-1">
+            <span
+              className={`text-[10px] uppercase tracking-[0.12em] font-extrabold px-2 py-1 border ${tone.badge}`}
+              style={{ borderRadius: 0 }}
+            >
+              {labels[risk]}
+            </span>
+            <span className={`text-[9px] uppercase tracking-[0.08em] font-extrabold px-2 py-0.5 border ${sanctions.className}`}>
+              {sanctions.label}
+            </span>
+          </div>
         </div>
 
         <div className="p-4 flex-1 flex items-end justify-between gap-4">

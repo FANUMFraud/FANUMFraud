@@ -38,6 +38,10 @@ type Dictionary = {
     placeholder: string;
     noResults: (q: string) => string;
     hint: string;
+    liveAction: string;
+    liveLoading: string;
+    liveSuccess: (found: number, scored: number) => string;
+    liveError: string;
   };
   card: {
     riskHigh: string;
@@ -122,6 +126,11 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
       placeholder: 'Szukaj firmy po nazwie lub NIP…',
       noResults: (q) => `Brak wyników dla „${q}”.`,
       hint: 'Co najmniej 2 znaki',
+      liveAction: 'Sprawdź online',
+      liveLoading: 'Sprawdzanie źródeł online...',
+      liveSuccess: (found, scored) =>
+        `Sprawdzenie online zakończone: ${found} publikacji, ${scored} ocenionych.`,
+      liveError: 'Nie udało się wykonać sprawdzenia online.',
     },
     card: {
       riskHigh: 'Wysokie ryzyko',
@@ -205,6 +214,11 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
       placeholder: 'Search by name or VAT number…',
       noResults: (q) => `No results for “${q}”.`,
       hint: 'At least 2 characters',
+      liveAction: 'Check online',
+      liveLoading: 'Checking online sources...',
+      liveSuccess: (found, scored) =>
+        `Online check completed: ${found} publications found, ${scored} scored.`,
+      liveError: 'Could not complete the online check.',
     },
     card: {
       riskHigh: 'High risk',

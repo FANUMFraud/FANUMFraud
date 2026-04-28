@@ -1,172 +1,200 @@
 """
-Sanctions checking service using OpenSanctions API.
+Sanctions checking service using OpenSanctions/Yente search.
 
-Checks if a company is on any sanctions list (OFAC, EU, UN, etc.)
+The important compliance distinction is:
+- listed: checked and matched sanctions/watchlist data
+- clear: checked and no relevant match found
+- unavailable: check could not be performed
 """
 
+from __future__ import annotations
+
 import logging
+import os
 from typing import Any
 
 try:
     import requests
-except ImportError:
-    requests = None  # type: ignore
+except ImportError:  # pragma: no cover - dependency guard for local dev
+    requests = None  # type: ignore[assignment]
 
 log = logging.getLogger(__name__)
 
-OPENSANCTIONS_API_URL = "https://api.opensanctions.org/datasets"
-OPENSANCTIONS_ENTITIES_URL = "https://api.opensanctions.org/entities"
+OPENSANCTIONS_SEARCH_URL = "https://api.opensanctions.org/search/default"
+OPENSANCTIONS_API_KEY = os.getenv("OPENSANCTIONS_API_KEY", "").strip()
 
-# Cache for sanctions lists (in production, use Redis)
+DEMO_SANCTIONED_NIPS = {
+    "1010000002": {
+        "name": "FANUM Demo Sanctions Watchlist",
+        "country": "International",
+        "match_score": 0.94,
+        "entity_id": "demo-vistula-logistics",
+        "reason": "Demo sanctions hit for presentation flow",
+    }
+}
+
 _SANCTIONS_CACHE: dict[str, dict[str, Any]] = {}
 
 
 def check_sanctions(company_name: str, nip: str | None = None) -> dict[str, Any]:
-    """
-    Check if company is on any sanctions list.
-
-    Returns:
-        {
-            "is_sanctioned": bool,
-            "lists": [{"name": str, "country": str, "match_score": float}],
-            "confidence": float,
-            "source": str,
-        }
-    """
-    if requests is None:
-        log.warning("requests library not available, skipping sanctions check")
-        return {
-            "is_sanctioned": False,
-            "lists": [],
-            "confidence": 0.0,
-            "source": "unavailable",
-        }
-
-    # Normalize search terms
+    """Check if a company is present on sanctions/watchlist data."""
     search_term = company_name.strip().lower()
-    if not search_term:
-        return {
-            "is_sanctioned": False,
-            "lists": [],
-            "confidence": 0.0,
-            "source": "empty",
-        }
-
-    # Check cache first
     cache_key = f"{search_term}_{nip or 'no_nip'}"
     if cache_key in _SANCTIONS_CACHE:
         return _SANCTIONS_CACHE[cache_key]
 
-    try:
-        result = _query_opensanctions(search_term, nip)
+    if nip in DEMO_SANCTIONED_NIPS:
+        result = _listed_result([DEMO_SANCTIONED_NIPS[nip]], "demo_sanctions")
         _SANCTIONS_CACHE[cache_key] = result
         return result
-    except Exception as e:
-        log.warning(f"Sanctions check failed for '{company_name}': {e}")
-        return {
-            "is_sanctioned": False,
-            "lists": [],
-            "confidence": 0.0,
-            "source": "error",
-        }
 
+    if requests is None:
+        result = _unavailable_result("requests_missing", "requests library not available")
+        _SANCTIONS_CACHE[cache_key] = result
+        return result
 
-def _query_opensanctions(company_name: str, nip: str | None = None) -> dict[str, Any]:
-    """Query OpenSanctions API for company matches."""
+    if not search_term:
+        result = _unavailable_result("empty_query", "empty company name")
+        _SANCTIONS_CACHE[cache_key] = result
+        return result
+
+    if not OPENSANCTIONS_API_KEY:
+        result = _unavailable_result("missing_api_key", "OPENSANCTIONS_API_KEY is not configured")
+        _SANCTIONS_CACHE[cache_key] = result
+        return result
+
     try:
-        # Search for entity by name
-        params = {
-            "q": company_name,
-            "dataset": "all",
-        }
+        result = _query_opensanctions(search_term)
+    except Exception as exc:
+        log.warning("Sanctions check failed for '%s': %s", company_name, exc)
+        result = _unavailable_result("api_error", str(exc))
 
-        response = requests.get(
-            OPENSANCTIONS_ENTITIES_URL,
-            params=params,
-            timeout=5,
-        )
-        response.raise_for_status()
+    _SANCTIONS_CACHE[cache_key] = result
+    return result
 
-        data = response.json()
-        results = data.get("results", [])
 
-        if not results:
-            return {
-                "is_sanctioned": False,
-                "lists": [],
-                "confidence": 0.0,
-                "source": "opensanctions",
-            }
+def _query_opensanctions(company_name: str) -> dict[str, Any]:
+    params = {
+        "q": company_name,
+        "limit": 5,
+        "schema": "Company",
+    }
+    headers = {
+        "Authorization": f"ApiKey {OPENSANCTIONS_API_KEY}",
+        "User-Agent": "FANUMFraud/0.1",
+    }
 
-        # Process matches
-        lists_found = []
-        max_confidence = 0.0
+    response = requests.get(
+        OPENSANCTIONS_SEARCH_URL,
+        params=params,
+        headers=headers,
+        timeout=8,
+    )
+    response.raise_for_status()
 
-        for entity in results[:5]:  # Top 5 matches
-            # Calculate match score based on schema/properties
-            match_score = _calculate_match_score(entity, company_name)
+    data = response.json()
+    results = data.get("results", [])
+    if not results:
+        return _clear_result("opensanctions")
 
-            if match_score > 0.5:  # Threshold
-                sanctions_list = entity.get("caption", "").lower()
-                country = entity.get("countries", [None])[0]
+    lists_found: list[dict[str, Any]] = []
+    max_confidence = 0.0
+    for entity in results[:5]:
+        match_score = _calculate_match_score(entity, company_name)
+        is_target = bool(entity.get("target"))
+        if is_target and match_score >= 0.55:
+            lists_found.append(
+                {
+                    "name": _entity_dataset_label(entity),
+                    "country": _entity_country(entity),
+                    "match_score": round(match_score, 2),
+                    "entity_id": entity.get("id"),
+                    "caption": entity.get("caption"),
+                }
+            )
+            max_confidence = max(max_confidence, match_score)
 
-                lists_found.append(
-                    {
-                        "name": entity.get("caption", "Unknown List"),
-                        "country": country or "International",
-                        "match_score": round(match_score, 2),
-                        "entity_id": entity.get("id"),
-                    }
-                )
-                max_confidence = max(max_confidence, match_score)
+    if not lists_found:
+        return _clear_result("opensanctions")
 
-        is_sanctioned = len(lists_found) > 0 and max_confidence > 0.6
+    return {
+        "is_sanctioned": True,
+        "status": "listed",
+        "available": True,
+        "lists": lists_found,
+        "confidence": round(max_confidence, 2),
+        "source": "opensanctions",
+    }
 
-        return {
-            "is_sanctioned": is_sanctioned,
-            "lists": lists_found,
-            "confidence": round(max_confidence, 2),
-            "source": "opensanctions",
-        }
 
-    except requests.RequestException as e:
-        log.warning(f"OpenSanctions API error: {e}")
-        return {
-            "is_sanctioned": False,
-            "lists": [],
-            "confidence": 0.0,
-            "source": "api_error",
-        }
+def _listed_result(lists: list[dict[str, Any]], source: str) -> dict[str, Any]:
+    confidence = max((float(item.get("match_score", 0.0)) for item in lists), default=0.0)
+    return {
+        "is_sanctioned": True,
+        "status": "listed",
+        "available": True,
+        "lists": lists,
+        "confidence": round(confidence, 2),
+        "source": source,
+    }
+
+
+def _clear_result(source: str) -> dict[str, Any]:
+    return {
+        "is_sanctioned": False,
+        "status": "clear",
+        "available": True,
+        "lists": [],
+        "confidence": 0.0,
+        "source": source,
+    }
+
+
+def _unavailable_result(source: str, reason: str) -> dict[str, Any]:
+    return {
+        "is_sanctioned": False,
+        "status": "unavailable",
+        "available": False,
+        "lists": [],
+        "confidence": 0.0,
+        "source": source,
+        "reason": reason,
+    }
 
 
 def _calculate_match_score(entity: dict[str, Any], company_name: str) -> float:
-    """
-    Calculate match score between entity and company name.
-
-    Simple heuristic:
-    - Exact match or caption contains name: 0.95
-    - Name contains entity: 0.80
-    - Fuzzy match: 0.60
-    """
-    entity_caption = entity.get("caption", "").lower()
+    entity_caption = str(entity.get("caption", "")).lower()
     company_lower = company_name.lower()
 
+    api_score = float(entity.get("score") or 0.0)
+    if api_score > 1.0:
+        api_score = api_score / 100.0
+
     if entity_caption == company_lower:
-        return 0.95
-
+        return max(api_score, 0.95)
     if company_lower in entity_caption or entity_caption in company_lower:
-        return 0.80
+        return max(api_score, 0.80)
 
-    # Simple token overlap for fuzzy matching
     entity_tokens = set(entity_caption.split())
     company_tokens = set(company_lower.split())
     overlap = len(entity_tokens & company_tokens)
     max_tokens = max(len(entity_tokens), len(company_tokens))
-
-    if max_tokens > 0:
-        return min(0.75, overlap / max_tokens)
-
-    return 0.0
+    token_score = min(0.75, overlap / max_tokens) if max_tokens else 0.0
+    return max(api_score, token_score)
 
 
-__all__ = ["check_sanctions", "SanctionsCheck"]
+def _entity_country(entity: dict[str, Any]) -> str:
+    countries = entity.get("countries") or entity.get("properties", {}).get("country") or []
+    if isinstance(countries, list) and countries:
+        return str(countries[0]).upper()
+    return "International"
+
+
+def _entity_dataset_label(entity: dict[str, Any]) -> str:
+    datasets = entity.get("datasets") or []
+    if isinstance(datasets, list) and datasets:
+        return str(datasets[0])
+    return str(entity.get("caption") or "OpenSanctions match")
+
+
+__all__ = ["check_sanctions"]

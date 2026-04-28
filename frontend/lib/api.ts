@@ -12,14 +12,19 @@ export const api = axios.create({
 
 export interface SanctionsCheck {
   is_sanctioned: boolean;
+  status: 'listed' | 'clear' | 'unavailable' | string;
+  available: boolean;
   lists: Array<{
     name: string;
     country: string;
     match_score: number;
     entity_id?: string;
+    caption?: string;
+    reason?: string;
   }>;
   confidence: number;
   source: string;
+  reason?: string | null;
 }
 
 export interface Company {
@@ -36,6 +41,18 @@ export interface Company {
     price: number;
     change_percent: number;
   } | null;
+}
+
+export interface LiveCompanySearchResponse {
+  query: string;
+  company_id: number;
+  created: boolean;
+  articles_found: number;
+  articles_saved: number;
+  articles_scored: number;
+  articles_skipped: number;
+  status: string;
+  company: Company;
 }
 
 export type MomentumLabel =
@@ -98,6 +115,15 @@ export const getCompanyArticles = (
 
 export const searchCompanies = (q: string): Promise<Company[]> =>
   api.get<Company[]>(`/companies/search`, { params: { q } }).then((r) => r.data);
+
+export const runLiveCompanySearch = (query: string): Promise<LiveCompanySearchResponse> =>
+  api
+    .post<LiveCompanySearchResponse>(
+      '/companies/search/live',
+      { query, limit: 12, force_refresh: false },
+      { timeout: 60000 }
+    )
+    .then((r) => r.data);
 
 export const getArticles = (): Promise<Article[]> =>
   api.get<Article[]>('/articles').then((r) => r.data);

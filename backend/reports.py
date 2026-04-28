@@ -265,6 +265,15 @@ def _build_pdf(
                 )
             )
         story.append(Spacer(1, 0.25 * inch))
+    elif sanctions and sanctions.get("status") == "unavailable":
+        story.append(Paragraph("Sanctions Check Not Completed", heading_style))
+        story.append(
+            Paragraph(
+                "The sanctions source was unavailable or not configured. Treat this as an unresolved compliance check, not as a confirmed clear result.",
+                ParagraphStyle("Warning", parent=normal_style, textColor=RISK_MEDIUM_COLOR),
+            )
+        )
+        story.append(Spacer(1, 0.25 * inch))
 
     # Footer
     story.append(Spacer(1, 0.15 * inch))

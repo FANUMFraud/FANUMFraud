@@ -28,6 +28,22 @@ const momentumBadgeClass = {
   good: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
 } as const;
 
+const sanctionsBadgeClass = {
+  listed: riskBadgeClass.high,
+  clear: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  unavailable: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+} as const;
+
+function sanctionsStatus(company: Company, locale: string): { label: string; className: string } {
+  if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
+    return { label: locale === 'pl' ? 'Na liście' : 'Listed', className: sanctionsBadgeClass.listed };
+  }
+  if (company.sanctions?.status === 'clear' || company.sanctions?.available === true) {
+    return { label: locale === 'pl' ? 'Brak wpisu' : 'Clear', className: sanctionsBadgeClass.clear };
+  }
+  return { label: locale === 'pl' ? 'Nie sprawdzono' : 'Not checked', className: sanctionsBadgeClass.unavailable };
+}
+
 interface RegistrySectionProps {
   title: string;
   companies: Company[];
@@ -48,8 +64,6 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
     sanctions: locale === 'pl' ? 'Sankcje' : 'Sanctions',
     online: locale === 'pl' ? 'Dane online' : 'Online data',
     demo: locale === 'pl' ? 'Dane demo' : 'Demo data',
-    clear: locale === 'pl' ? 'Brak wpisu' : 'Clear',
-    listed: locale === 'pl' ? 'Na liście' : 'Listed',
   };
 
   return (
@@ -76,6 +90,7 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
               const momentumDelta = company.momentum_7d?.delta ?? 0;
               const momentumDirection = momentumTone(momentumDelta);
               const sourceIsDemo = isDemoCompany(company);
+              const sanctions = sanctionsStatus(company, locale);
               return (
                 <tr key={company.id} className="hover:bg-[var(--surface-alt)] transition-colors">
                   <td className="px-4 py-3 min-w-[280px] border-r border-[var(--rule)]">
@@ -121,8 +136,8 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${company.sanctions?.is_sanctioned ? riskBadgeClass.high : 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]'}`}>
-                      {company.sanctions?.is_sanctioned ? labels.listed : labels.clear}
+                    <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${sanctions.className}`}>
+                      {sanctions.label}
                     </span>
                   </td>
                 </tr>

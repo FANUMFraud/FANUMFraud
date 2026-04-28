@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { searchCompanies, type Company } from '@/lib/api';
+import { runLiveCompanySearch, searchCompanies, type Company } from '@/lib/api';
 import { getRiskLevel, formatScore } from '@/lib/risk';
 import { useI18n } from '@/lib/i18n/I18nProvider';
 
@@ -13,13 +13,22 @@ const riskTextClass = (score: number) => {
   return 'text-[var(--risk-low)]';
 };
 
+type LiveStatus = {
+  kind: 'success' | 'error';
+  text: string;
+};
+
 export default function SearchBar() {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const cleanQuery = query.trim();
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -32,7 +41,7 @@ export default function SearchBar() {
   }, []);
 
   useEffect(() => {
-    if (query.trim().length < 2) {
+    if (cleanQuery.length < 2) {
       setResults([]);
       setIsOpen(false);
       return;
@@ -40,7 +49,7 @@ export default function SearchBar() {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const data = await searchCompanies(query);
+        const data = await searchCompanies(cleanQuery);
         setResults(data);
         setIsOpen(true);
       } catch {
@@ -50,44 +59,87 @@ export default function SearchBar() {
       }
     }, 280);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [cleanQuery]);
+
+  const handleLiveSearch = async () => {
+    if (cleanQuery.length < 2 || liveLoading) return;
+
+    setLiveLoading(true);
+    setLiveStatus(null);
+    setIsOpen(false);
+    try {
+      const data = await runLiveCompanySearch(cleanQuery);
+      setResults([data.company]);
+      setIsOpen(true);
+      setLiveStatus({
+        kind: 'success',
+        text: t.search.liveSuccess(data.articles_found, data.articles_scored),
+      });
+    } catch {
+      setLiveStatus({ kind: 'error', text: t.search.liveError });
+    } finally {
+      setLiveLoading(false);
+    }
+  };
 
   return (
     <div ref={containerRef} className="relative w-full z-40">
-      <div className="relative flex items-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="absolute left-4 w-[18px] h-[18px] text-[var(--ink-muted)] pointer-events-none"
-          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <div className="relative flex items-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="absolute left-4 w-[18px] h-[18px] text-[var(--ink-muted)] pointer-events-none"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setLiveStatus(null); }}
+            placeholder={t.search.placeholder}
+            aria-label={t.search.placeholder}
+            className="doc-input pl-12 pr-16"
+          />
+
+          {loading && !liveLoading && (
+            <div className="absolute right-4">
+              <div className="w-3.5 h-3.5 border-2 border-[var(--border)] border-t-[var(--ink)] rounded-full animate-spin" />
+            </div>
+          )}
+
+          {!loading && cleanQuery.length > 0 && cleanQuery.length < 2 && (
+            <span className="absolute right-4 text-[10px] uppercase tracking-[0.12em] font-extrabold text-[var(--ink-muted)] pointer-events-none">
+              {t.search.hint}
+            </span>
+          )}
+        </div>
+
+        <button
+          type="button"
+          onClick={handleLiveSearch}
+          disabled={cleanQuery.length < 2 || liveLoading}
+          className="doc-btn doc-btn--primary h-12 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
-
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t.search.placeholder}
-          aria-label={t.search.placeholder}
-          className="doc-input pl-12 pr-16"
-        />
-
-        {loading && (
-          <div className="absolute right-4">
-            <div className="w-3.5 h-3.5 border-2 border-[var(--border)] border-t-[var(--ink)] rounded-full animate-spin" />
-          </div>
-        )}
-
-        {!loading && query.trim().length > 0 && query.trim().length < 2 && (
-          <span className="absolute right-4 text-[10px] uppercase tracking-[0.12em] font-extrabold text-[var(--ink-muted)] pointer-events-none">
-            {t.search.hint}
-          </span>
-        )}
+          {liveLoading ? t.search.liveLoading : t.search.liveAction}
+        </button>
       </div>
+
+      {liveStatus && (
+        <p
+          aria-live="polite"
+          className={`mt-2 text-xs font-semibold ${
+            liveStatus.kind === 'success' ? 'text-[var(--risk-low)]' : 'text-[var(--risk-high)]'
+          }`}
+        >
+          {liveStatus.text}
+        </p>
+      )}
 
       {isOpen && (
         <div
-          className="absolute mt-[-1px] w-full bg-[var(--surface)] border-2 border-[var(--border-strong)] border-t-0 shadow-[0_8px_0_rgba(17,24,39,0.08)]"
+          className="absolute top-full mt-2 w-full bg-[var(--surface)] border-2 border-[var(--border-strong)] shadow-[0_8px_0_rgba(17,24,39,0.08)]"
           style={{ borderRadius: 0 }}
         >
           {results.length > 0 ? (
