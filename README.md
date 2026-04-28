@@ -1,5 +1,15 @@
 # FANUMFraud
 
+## Our team
+
+### Patryk Jurak
+### Maksymilian Wójcik
+### Grzegorz Makowski
+### Tomasz Zając
+### Michał Karwacki
+
+---
+
 Prototype system for monitoring company reputation based on media publications, focused on AML risk support.
 
 This project was built for the Transparent Data hackathon challenge:
