@@ -40,6 +40,7 @@ export interface Company {
   momentum_7d?: RiskMomentum | null;
   momentum_30d?: RiskMomentum | null;
   sanctions?: SanctionsCheck | null;
+  evidence_quality?: EvidenceQuality | null;
   ticker_gpw?: string | null;
   stock_price?: {
     price: number;
@@ -52,6 +53,16 @@ export interface NipCheck {
   valid: boolean;
   normalized?: string | null;
   reason?: string | null;
+}
+
+export interface EvidenceQuality {
+  score: number;
+  level: 'high' | 'medium' | 'low' | string;
+  articles_count: number;
+  sources_count: number;
+  official_sources_count: number;
+  recent_articles_count: number;
+  reasons: string[];
 }
 
 export interface LiveCompanySearchResponse {

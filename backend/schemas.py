@@ -62,6 +62,21 @@ class NipCheck(BaseModel):
     reason: str | None = None
 
 
+class EvidenceQuality(BaseModel):
+    score: float
+    level: str
+    articles_count: int = 0
+    sources_count: int = 0
+    official_sources_count: int = 0
+    recent_articles_count: int = 0
+    reasons: list[str] = Field(default_factory=list)
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def _round_evidence_score(cls, value: float | int | None) -> float:
+        return _round_score(value)
+
+
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -79,6 +94,7 @@ class CompanyResponse(BaseModel):
     momentum_7d: RiskMomentum | None = None
     momentum_30d: RiskMomentum | None = None
     sanctions: SanctionsCheck | None = None
+    evidence_quality: EvidenceQuality | None = None
 
     @field_validator("current_score", mode="before")
     @classmethod

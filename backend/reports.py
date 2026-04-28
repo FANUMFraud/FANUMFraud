@@ -57,6 +57,7 @@ def generate_risk_report(
     momentum_30d: dict[str, Any] | None,
     top_categories: list[dict[str, Any]] | None,
     sanctions: dict[str, Any] | None,
+    evidence_quality: dict[str, Any] | None,
     decision: dict[str, Any] | None,
     articles_count: int,
     generated_at: datetime | None = None,
@@ -83,6 +84,7 @@ def generate_risk_report(
             momentum_30d=momentum_30d,
             top_categories=top_categories,
             sanctions=sanctions,
+            evidence_quality=evidence_quality,
             decision=decision,
             articles_count=articles_count,
             generated_at=generated_at or datetime.now(),
@@ -103,6 +105,7 @@ def _build_pdf(
     momentum_30d: dict[str, Any] | None,
     top_categories: list[dict[str, Any]] | None,
     sanctions: dict[str, Any] | None,
+    evidence_quality: dict[str, Any] | None,
     decision: dict[str, Any] | None,
     articles_count: int,
     generated_at: datetime,
@@ -171,6 +174,7 @@ def _build_pdf(
         ["Risk Level", risk_level.upper()],
         ["NIP", nip or "N/A"],
         ["NIP Status", _nip_status_label(nip_check)],
+        ["Evidence Quality", _evidence_quality_label(evidence_quality)],
         ["Associated Articles", str(articles_count)],
     ]
     summary_table = Table(summary_data, colWidths=[2 * inch, 2.5 * inch])
@@ -206,6 +210,19 @@ def _build_pdf(
                     textColor=_decision_to_color(decision_level),
                     fontSize=12,
                 ),
+            )
+        )
+        for reason in reasons[:4]:
+            story.append(Paragraph(f"• {reason}", normal_style))
+        story.append(Spacer(1, 0.25 * inch))
+
+    if evidence_quality:
+        story.append(Paragraph("Evidence Quality", heading_style))
+        reasons = evidence_quality.get("reasons") or []
+        story.append(
+            Paragraph(
+                f"<b>{_evidence_quality_label(evidence_quality)}</b>",
+                normal_style,
             )
         )
         for reason in reasons[:4]:
@@ -345,6 +362,14 @@ def _nip_status_label(check: dict[str, Any] | None) -> str:
     if normalized:
         return f"{status} ({normalized})"
     return status
+
+
+def _evidence_quality_label(evidence_quality: dict[str, Any] | None) -> str:
+    if not evidence_quality:
+        return "UNKNOWN"
+    level = str(evidence_quality.get("level") or "unknown").upper()
+    score = float(evidence_quality.get("score") or 0.0)
+    return f"{level} ({score:.1f}/100)"
 
 
 __all__ = ["generate_risk_report"]

@@ -91,6 +91,24 @@ const nipStatusStyles = {
   missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
 } as const;
 
+const evidenceQualityStyles = {
+  high: {
+    border: 'var(--risk-low-rule)',
+    background: 'var(--risk-low-bg)',
+    color: 'var(--risk-low)',
+  },
+  medium: {
+    border: 'var(--risk-medium-rule)',
+    background: 'var(--risk-medium-bg)',
+    color: 'var(--risk-medium)',
+  },
+  low: {
+    border: 'var(--border)',
+    background: 'var(--surface-alt)',
+    color: 'var(--ink-muted)',
+  },
+} as const;
+
 function nipStatusView(company: Company, locale: string) {
   const status = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
   if (status === 'valid') {
@@ -111,6 +129,24 @@ function nipStatusView(company: Company, locale: string) {
     status: 'missing',
     label: locale === 'pl' ? 'Brak NIP' : 'NIP missing',
     className: nipStatusStyles.missing,
+  };
+}
+
+function evidenceQualityView(company: Company, locale: string) {
+  const level = company.evidence_quality?.level === 'high' || company.evidence_quality?.level === 'medium'
+    ? company.evidence_quality.level
+    : 'low';
+  const labels = {
+    high: locale === 'pl' ? 'Wysoka jakość dowodów' : 'High evidence quality',
+    medium: locale === 'pl' ? 'Średnia jakość dowodów' : 'Medium evidence quality',
+    low: locale === 'pl' ? 'Niska jakość dowodów' : 'Low evidence quality',
+  } as const;
+  return {
+    level,
+    label: labels[level],
+    style: evidenceQualityStyles[level],
+    score: company.evidence_quality?.score ?? 0,
+    reasons: company.evidence_quality?.reasons ?? [],
   };
 }
 
@@ -391,6 +427,7 @@ export default function CompanyDetailPage() {
   const decision = dueDiligenceDecision(company, articles, locale);
   const decisionStyle = decisionStyles[decision.level];
   const nipView = nipStatusView(company, locale);
+  const evidenceView = evidenceQualityView(company, locale);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -435,7 +472,7 @@ export default function CompanyDetailPage() {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border border-[var(--border)] mt-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 border border-[var(--border)] mt-6">
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{locale === 'pl' ? 'Status ryzyka' : 'Risk status'}</div>
                       <div className="gov-meta-value">
@@ -460,6 +497,17 @@ export default function CompanyDetailPage() {
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{t.detail.addedOn}</div>
                       <div className="gov-meta-value tnum">{formattedDate}</div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Jakość dowodów' : 'Evidence quality'}</div>
+                      <div className="gov-meta-value">
+                        <span
+                          className="px-2 py-1 border font-extrabold uppercase tracking-[0.08em] text-[10px]"
+                          style={{ background: evidenceView.style.background, borderColor: evidenceView.style.border, color: evidenceView.style.color }}
+                        >
+                          {evidenceView.score.toFixed(0)}/100
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -532,6 +580,56 @@ export default function CompanyDetailPage() {
                       </li>
                     ))}
                   </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="gov-panel">
+              <div className="gov-section-header">
+                <span>{locale === 'pl' ? 'Jakość materiału dowodowego' : 'Evidence quality'}</span>
+                <span>{locale === 'pl' ? 'Niezależnie od score ryzyka' : 'Independent from risk score'}</span>
+              </div>
+              <div className="p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
+                <div
+                  className="border p-5"
+                  style={{ borderColor: evidenceView.style.border, background: evidenceView.style.background }}
+                >
+                  <p className="eyebrow mb-2" style={{ color: evidenceView.style.color }}>
+                    {evidenceView.label}
+                  </p>
+                  <p className="text-[44px] font-extrabold tnum leading-none" style={{ color: evidenceView.style.color }}>
+                    {evidenceView.score.toFixed(0)}
+                    <span className="text-base text-[var(--ink-muted)] ml-1">/100</span>
+                  </p>
+                  <p className="text-sm text-[var(--ink-2)] mt-3">
+                    {locale === 'pl'
+                      ? 'Wskaźnik mierzy siłę podstawy dowodowej: liczbę publikacji, źródła oficjalne, różnorodność źródeł i świeżość materiału.'
+                      : 'This indicator measures evidence strength: publication count, official sources, source diversity, and recency.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 border border-[var(--border)]">
+                  {[
+                    { label: locale === 'pl' ? 'Publikacje' : 'Publications', value: company.evidence_quality?.articles_count ?? 0 },
+                    { label: locale === 'pl' ? 'Źródła' : 'Sources', value: company.evidence_quality?.sources_count ?? 0 },
+                    { label: locale === 'pl' ? 'Oficjalne' : 'Official', value: company.evidence_quality?.official_sources_count ?? 0 },
+                    { label: locale === 'pl' ? 'Ostatnie 30d' : 'Recent 30d', value: company.evidence_quality?.recent_articles_count ?? 0 },
+                  ].map((item) => (
+                    <div key={item.label} className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{item.label}</div>
+                      <div className="gov-meta-value font-mono tnum">{item.value}</div>
+                    </div>
+                  ))}
+                  <div className="col-span-2 lg:col-span-4 border-t border-[var(--rule)] p-4">
+                    <p className="eyebrow mb-3">{locale === 'pl' ? 'Uzasadnienie' : 'Rationale'}</p>
+                    <ul className="space-y-2 text-sm text-[var(--ink-2)]">
+                      {(evidenceView.reasons.length > 0 ? evidenceView.reasons : [locale === 'pl' ? 'Brak punktowanych publikacji w oknie dowodowym.' : 'No scored publications in the evidence window.']).map((reason) => (
+                        <li key={reason} className="flex gap-2">
+                          <span style={{ color: evidenceView.style.color }} aria-hidden="true">■</span>
+                          <span>{reason}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
             </section>

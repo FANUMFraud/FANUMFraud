@@ -43,6 +43,12 @@ const nipStyle = {
   missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
 } as const;
 
+const evidenceStyle = {
+  high: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  medium: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+  low: 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+} as const;
+
 function getSanctionsView(company: Company, locale: string) {
   if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
     return { label: locale === 'pl' ? 'Sankcje: na liście' : 'Sanctions: listed', className: sanctionsStyle.listed };
@@ -64,6 +70,18 @@ function getNipView(company: Company, locale: string) {
   return { label: locale === 'pl' ? 'Brak NIP' : 'NIP missing', className: nipStyle.missing };
 }
 
+function getEvidenceView(company: Company, locale: string) {
+  const level = company.evidence_quality?.level === 'high' || company.evidence_quality?.level === 'medium'
+    ? company.evidence_quality.level
+    : 'low';
+  const labels = {
+    high: locale === 'pl' ? 'Dowody: wysokie' : 'Evidence: high',
+    medium: locale === 'pl' ? 'Dowody: średnie' : 'Evidence: medium',
+    low: locale === 'pl' ? 'Dowody: niskie' : 'Evidence: low',
+  } as const;
+  return { label: labels[level], className: evidenceStyle[level] };
+}
+
 export default function CompanyCard({ company, animationDelay = 0 }: Props) {
   const { t, locale } = useI18n();
   const risk = getRiskLevel(company.current_score);
@@ -83,6 +101,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
   } as const;
   const sanctions = getSanctionsView(company, locale);
   const nip = getNipView(company, locale);
+  const evidence = getEvidenceView(company, locale);
 
   return (
     <Link
@@ -121,6 +140,9 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
             </span>
             <span className={`text-[9px] uppercase tracking-[0.08em] font-extrabold px-2 py-0.5 border ${sanctions.className}`}>
               {sanctions.label}
+            </span>
+            <span className={`text-[9px] uppercase tracking-[0.08em] font-extrabold px-2 py-0.5 border ${evidence.className}`}>
+              {evidence.label}
             </span>
           </div>
         </div>

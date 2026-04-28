@@ -24,6 +24,7 @@ from schemas import (
     ArticleResponse,
     CompanyCreate,
     CompanyResponse,
+    EvidenceQuality,
     LiveCompanySearchRequest,
     LiveCompanySearchResponse,
     CompanySyncResponse,
@@ -219,6 +220,7 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
         momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
         sanctions=SanctionsCheck(**sanctions),
+        evidence_quality=_evidence_quality(db, company.id),
     )
 
 
@@ -280,6 +282,98 @@ def _momentum_label(delta: float) -> str:
     if delta < 20.0:
         return "recovering"
     return "strong_recovery"
+
+
+def _evidence_quality(db: Session, company_id: int, window_days: int = 180) -> EvidenceQuality:
+    cutoff = datetime.utcnow() - timedelta(days=window_days)
+    rows = (
+        db.query(ScoreHistory, Article)
+        .join(Article, Article.id == ScoreHistory.article_id)
+        .filter(
+            ScoreHistory.company_id == company_id,
+            ScoreHistory.article_id.is_not(None),
+            ScoreHistory.recorded_at >= cutoff,
+        )
+        .order_by(Article.published_at.desc(), ScoreHistory.id.desc())
+        .all()
+    )
+
+    articles_by_id: dict[int, tuple[ScoreHistory, Article]] = {}
+    for score, article in rows:
+        if article.id not in articles_by_id:
+            articles_by_id[article.id] = (score, article)
+
+    if not articles_by_id:
+        return EvidenceQuality(
+            score=0.0,
+            level="low",
+            reasons=["No scored publications in the evidence window."],
+        )
+
+    pairs = list(articles_by_id.values())
+    sources = {str(article.source or "").strip().lower() for _, article in pairs if article.source}
+    source_tiers = [_source_tier(article.source) for _, article in pairs]
+    official_count = sum(1 for tier in source_tiers if tier == "official")
+    business_count = sum(1 for tier in source_tiers if tier == "business")
+    recent_cutoff = datetime.utcnow() - timedelta(days=30)
+    recent_count = sum(
+        1 for _, article in pairs if article.published_at and article.published_at >= recent_cutoff
+    )
+    scored_count = sum(
+        1 for score, _ in pairs if float(score.risk_score or 0.0) > 0.0 and score.category
+    )
+
+    value = 0.0
+    value += min(len(pairs) * 10.0, 35.0)
+    value += min(max(len(sources) - 1, 0) * 7.0, 21.0)
+    value += min(official_count * 16.0, 24.0)
+    value += min(business_count * 7.0, 14.0)
+    value += min(recent_count * 4.0, 12.0)
+    value += min(scored_count * 3.0, 12.0)
+    value = min(value, 100.0)
+
+    if value >= 70.0:
+        level = "high"
+    elif value >= 40.0:
+        level = "medium"
+    else:
+        level = "low"
+
+    reasons = [f"{len(pairs)} unique scored publication(s) in the last {window_days} days."]
+    if official_count:
+        reasons.append(f"{official_count} official or regulatory source(s) increase evidentiary strength.")
+    elif business_count:
+        reasons.append(f"{business_count} business media source(s) support the evidence base.")
+    else:
+        reasons.append("No official source found in the evidence window.")
+    if len(sources) >= 2:
+        reasons.append(f"Evidence comes from {len(sources)} distinct source(s).")
+    if recent_count:
+        reasons.append(f"{recent_count} publication(s) are recent enough for current due diligence.")
+
+    return EvidenceQuality(
+        score=value,
+        level=level,
+        articles_count=len(pairs),
+        sources_count=len(sources),
+        official_sources_count=official_count,
+        recent_articles_count=recent_count,
+        reasons=reasons[:4],
+    )
+
+
+def _source_tier(source: str | None) -> str:
+    normalized = str(source or "").lower()
+    official_patterns = ("knf", "uokik", "gov.pl", "prokuratura", "policja", "police", "sad", "court", "ofac", "europa.eu")
+    business_patterns = ("money.pl", "bankier.pl", "businessinsider", "pb.pl", "parkiet", "rp.pl", "reuters", "bloomberg", "ft.com")
+    low_trust_patterns = ("blog", "forum", "social", "twitter", "x.com", "facebook")
+    if any(pattern in normalized for pattern in official_patterns):
+        return "official"
+    if any(pattern in normalized for pattern in business_patterns):
+        return "business"
+    if any(pattern in normalized for pattern in low_trust_patterns):
+        return "low"
+    return "standard"
 
 
 # GET /companies/{company_id}/articles
@@ -477,6 +571,7 @@ def export_company_report(
         momentum_30d=score_resp.momentum_30d.model_dump() if score_resp.momentum_30d else None,
         top_categories=top_categories,
         sanctions=sanctions_data,
+        evidence_quality=_evidence_quality(db, company.id).model_dump(),
         decision=decision,
         articles_count=articles_count,
     )

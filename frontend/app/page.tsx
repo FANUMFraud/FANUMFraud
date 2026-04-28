@@ -40,6 +40,12 @@ const nipBadgeClass = {
   missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
 } as const;
 
+const evidenceBadgeClass = {
+  high: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  medium: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+  low: 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+} as const;
+
 function sanctionsStatus(company: Company, locale: string): { label: string; className: string } {
   if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
     return { label: locale === 'pl' ? 'Na liście' : 'Listed', className: sanctionsBadgeClass.listed };
@@ -59,6 +65,17 @@ function nipStatus(company: Company, locale: string): { label: string; className
     return { label: locale === 'pl' ? 'NIP błędny' : 'NIP invalid', className: nipBadgeClass.invalid };
   }
   return { label: locale === 'pl' ? 'Brak NIP' : 'NIP missing', className: nipBadgeClass.missing };
+}
+
+function evidenceStatus(company: Company, locale: string): { label: string; className: string } {
+  const level = company.evidence_quality?.level === 'high' || company.evidence_quality?.level === 'medium'
+    ? company.evidence_quality.level
+    : 'low';
+  const score = company.evidence_quality?.score ?? 0;
+  const label = locale === 'pl'
+    ? `Dowody ${level === 'high' ? 'wys.' : level === 'medium' ? 'śr.' : 'nis.'} ${score.toFixed(0)}`
+    : `Evidence ${level} ${score.toFixed(0)}`;
+  return { label, className: evidenceBadgeClass[level] };
 }
 
 type DemoScenario = {
@@ -129,6 +146,7 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
     risk: locale === 'pl' ? 'Ryzyko' : 'Risk',
     trend: locale === 'pl' ? 'Trend 7d' : '7d trend',
     sanctions: locale === 'pl' ? 'Sankcje' : 'Sanctions',
+    evidence: locale === 'pl' ? 'Dowody' : 'Evidence',
     online: locale === 'pl' ? 'Dane online' : 'Online data',
     demo: locale === 'pl' ? 'Dane demo' : 'Demo data',
   };
@@ -144,7 +162,7 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
         <table className="w-full border-collapse text-sm">
           <thead className="bg-[var(--gov-blue)] text-white">
             <tr>
-              {[labels.entity, labels.source, labels.stock, labels.score, labels.risk, labels.trend, labels.sanctions].map((label) => (
+              {[labels.entity, labels.source, labels.stock, labels.score, labels.risk, labels.trend, labels.sanctions, labels.evidence].map((label) => (
                 <th key={label} className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.08em] font-extrabold border-r border-white/20 last:border-r-0">
                   {label}
                 </th>
@@ -159,6 +177,7 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
               const sourceIsDemo = isDemoCompany(company);
               const sanctions = sanctionsStatus(company, locale);
               const nip = nipStatus(company, locale);
+              const evidence = evidenceStatus(company, locale);
               return (
                 <tr key={company.id} className="hover:bg-[var(--surface-alt)] transition-colors">
                   <td className="px-4 py-3 min-w-[280px] border-r border-[var(--rule)]">
@@ -209,6 +228,11 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
                   <td className="px-4 py-3">
                     <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${sanctions.className}`}>
                       {sanctions.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${evidence.className}`}>
+                      {evidence.label}
                     </span>
                   </td>
                 </tr>
