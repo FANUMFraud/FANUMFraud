@@ -24,11 +24,13 @@ from schemas import (
     ArticleResponse,
     CompanyCreate,
     CompanyResponse,
+    Decision,
     EvidenceQuality,
     LiveCompanySearchRequest,
     LiveCompanySearchResponse,
     CompanySyncResponse,
     CompanyScoreResponse,
+    NipCheck,
     RiskMomentum,
     SanctionsCheck,
     ScorePoint,
@@ -206,21 +208,61 @@ def get_company_score(
 
 def _company_response(company: Company, db: Session) -> CompanyResponse:
     sanctions = check_sanctions(company.name, company.nip)
+    nip_check_data = nip_check(company.nip)
+    evidence_quality_obj = _evidence_quality(db, company.id)
+    momentum_7d = _risk_momentum(db, company.id, company.current_score, 7)
+    momentum_30d = _risk_momentum(db, company.id, company.current_score, 30)
+    
+    # Get score history for top categories
+    score_resp = get_company_score(company.id, days=90, db=db)
+    
+    # Calculate top categories for decision reasoning
+    top_categories = None
+    if score_resp.history:
+        categories: dict[str, float] = {}
+        for point in score_resp.history:
+            if point.category:
+                categories[point.category] = categories.get(point.category, 0) + point.risk_score
+        top_categories = [
+            {"category": cat, "points": points}
+            for cat, points in sorted(categories.items(), key=lambda x: x[1], reverse=True)
+        ]
+    
+    # Count articles
+    article_ids_stmt = (
+        select(ScoreHistory.article_id)
+        .where(ScoreHistory.company_id == company.id, ScoreHistory.article_id.is_not(None))
+        .distinct()
+    )
+    articles_count = db.query(Article).filter(Article.id.in_(article_ids_stmt)).count()
+    
+    # Compute decision
+    decision_data = _due_diligence_decision(
+        current_score=company.current_score,
+        momentum_7d=momentum_7d.model_dump() if momentum_7d else None,
+        sanctions=sanctions,
+        nip_check_data=nip_check_data,
+        evidence_quality=evidence_quality_obj.model_dump() if evidence_quality_obj else None,
+        articles_count=articles_count,
+        top_categories=top_categories,
+    )
+    
     return CompanyResponse(
         id=company.id,
         name=company.name,
         nip=company.nip,
-        nip_check=nip_check(company.nip),
+        nip_check=NipCheck(**nip_check_data) if nip_check_data else None,
         isin=company.isin,
         industry=company.industry,
         aliases=_company_aliases(company),
         current_score=company.current_score,
         created_at=company.created_at,
         ticker_gpw=company.ticker_gpw,
-        momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
-        momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
+        momentum_7d=momentum_7d,
+        momentum_30d=momentum_30d,
         sanctions=SanctionsCheck(**sanctions),
-        evidence_quality=_evidence_quality(db, company.id),
+        evidence_quality=evidence_quality_obj,
+        decision=Decision(**decision_data) if decision_data else None,
     )
 
 
@@ -461,12 +503,17 @@ def _due_diligence_decision(
     current_score: float,
     momentum_7d: dict[str, Any] | None,
     sanctions: dict[str, Any] | None,
-    nip_status: str | None,
+    nip_check_data: dict[str, Any] | None,
+    evidence_quality: dict[str, Any] | None,
     articles_count: int,
     top_categories: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
     delta_7d = float((momentum_7d or {}).get("delta") or 0.0)
     top_category = (top_categories or [{}])[0].get("category") if top_categories else None
+    evidence_articles = int((evidence_quality or {}).get("articles_count") or 0)
+    evidence_score = float((evidence_quality or {}).get("score") or 0.0)
+    nip_status = str((nip_check_data or {}).get("status") or "missing")
+    nip_registry_status = str((nip_check_data or {}).get("registry_status") or "").lower()
 
     if sanctions and (sanctions.get("is_sanctioned") or sanctions.get("status") == "listed"):
         return {
@@ -488,7 +535,15 @@ def _due_diligence_decision(
             ],
         }
 
-    if current_score < 75.0 or delta_7d <= -5.0 or (sanctions and sanctions.get("status") == "unavailable") or nip_status in {"missing", "invalid"}:
+    if (
+        current_score < 75.0
+        or delta_7d <= -5.0
+        or (sanctions and sanctions.get("status") == "unavailable")
+        or nip_status in {"missing", "invalid"}
+        or (nip_status == "valid" and nip_registry_status != "verified")
+        or evidence_articles <= 0
+        or evidence_score < 40.0
+    ):
         reasons = ["Manual review is required before onboarding or renewal."]
         if top_category:
             reasons.append(f"Dominant risk category: {top_category}.")
@@ -498,6 +553,14 @@ def _due_diligence_decision(
             reasons.append("NIP checksum or format is invalid.")
         if nip_status == "missing":
             reasons.append("NIP is missing, so entity identification is incomplete.")
+        if nip_status == "valid" and nip_registry_status == "not_found":
+            reasons.append("The public MF VAT registry did not confirm this NIP.")
+        elif nip_status == "valid" and nip_registry_status == "unavailable":
+            reasons.append("The public MF VAT registry was unavailable during verification.")
+        if evidence_articles <= 0:
+            reasons.append("No online evidence was found for this entity.")
+        elif evidence_score < 40.0:
+            reasons.append("Evidence quality is low, so the assessment needs manual confirmation.")
         return {"level": "review", "title": "Manual review required", "reasons": reasons}
 
     return {
@@ -550,11 +613,14 @@ def export_company_report(
             for cat, points in sorted(categories.items(), key=lambda x: x[1], reverse=True)
         ]
 
+    evidence_quality = _evidence_quality(db, company.id).model_dump()
+
     decision = _due_diligence_decision(
         current_score=company.current_score,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         sanctions=sanctions_data,
-        nip_status=str(nip_check(company.nip).get("status") or "missing"),
+        nip_check_data=nip_check(company.nip),
+        evidence_quality=evidence_quality,
         articles_count=articles_count,
         top_categories=top_categories,
     )
@@ -571,7 +637,7 @@ def export_company_report(
         momentum_30d=score_resp.momentum_30d.model_dump() if score_resp.momentum_30d else None,
         top_categories=top_categories,
         sanctions=sanctions_data,
-        evidence_quality=_evidence_quality(db, company.id).model_dump(),
+        evidence_quality=evidence_quality,
         decision=decision,
         articles_count=articles_count,
     )

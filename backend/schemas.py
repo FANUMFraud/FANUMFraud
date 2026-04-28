@@ -60,6 +60,12 @@ class NipCheck(BaseModel):
     valid: bool
     normalized: str | None = None
     reason: str | None = None
+    registry_status: str | None = None
+    registry_name: str | None = None
+    registry_vat_status: str | None = None
+    registry_source: str | None = None
+    registry_checked_at: datetime | None = None
+    registry_reason: str | None = None
 
 
 class EvidenceQuality(BaseModel):
@@ -75,6 +81,12 @@ class EvidenceQuality(BaseModel):
     @classmethod
     def _round_evidence_score(cls, value: float | int | None) -> float:
         return _round_score(value)
+
+
+class Decision(BaseModel):
+    level: str = Field(..., description="Decision level: proceed, review, or block")
+    title: str = Field(..., description="Decision title")
+    reasons: list[str] = Field(default_factory=list, description="List of reasons for the decision")
 
 
 class CompanyResponse(BaseModel):
@@ -95,6 +107,7 @@ class CompanyResponse(BaseModel):
     momentum_30d: RiskMomentum | None = None
     sanctions: SanctionsCheck | None = None
     evidence_quality: EvidenceQuality | None = None
+    decision: Decision | None = None
 
     @field_validator("current_score", mode="before")
     @classmethod

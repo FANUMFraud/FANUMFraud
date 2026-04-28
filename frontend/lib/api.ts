@@ -41,6 +41,7 @@ export interface Company {
   momentum_30d?: RiskMomentum | null;
   sanctions?: SanctionsCheck | null;
   evidence_quality?: EvidenceQuality | null;
+  decision?: Decision | null;
   ticker_gpw?: string | null;
   stock_price?: {
     price: number;
@@ -53,6 +54,12 @@ export interface NipCheck {
   valid: boolean;
   normalized?: string | null;
   reason?: string | null;
+  registry_status?: 'verified' | 'not_found' | 'unavailable' | 'not_checked' | string | null;
+  registry_name?: string | null;
+  registry_vat_status?: string | null;
+  registry_source?: string | null;
+  registry_checked_at?: string | null;
+  registry_reason?: string | null;
 }
 
 export interface EvidenceQuality {
@@ -62,6 +69,12 @@ export interface EvidenceQuality {
   sources_count: number;
   official_sources_count: number;
   recent_articles_count: number;
+  reasons: string[];
+}
+
+export interface Decision {
+  level: 'proceed' | 'review' | 'block' | string;
+  title: string;
   reasons: string[];
 }
 

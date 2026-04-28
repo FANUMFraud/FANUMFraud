@@ -111,10 +111,11 @@ const evidenceQualityStyles = {
 
 function nipStatusView(company: Company, locale: string) {
   const status = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
-  if (status === 'valid') {
+  const registryStatus = company.nip_check?.registry_status;
+  if (status === 'valid' && registryStatus === 'verified') {
     return {
       status,
-      label: locale === 'pl' ? 'NIP poprawny' : 'NIP valid',
+      label: locale === 'pl' ? 'NIP zweryfikowany' : 'NIP verified',
       className: nipStatusStyles.valid,
     };
   }
@@ -123,6 +124,20 @@ function nipStatusView(company: Company, locale: string) {
       status,
       label: locale === 'pl' ? 'NIP niepoprawny' : 'NIP invalid',
       className: nipStatusStyles.invalid,
+    };
+  }
+  if (status === 'valid' && registryStatus === 'not_found') {
+    return {
+      status,
+      label: locale === 'pl' ? 'NIP niepotwierdzony' : 'NIP unverified',
+      className: nipStatusStyles.missing,
+    };
+  }
+  if (status === 'valid' && registryStatus === 'unavailable') {
+    return {
+      status,
+      label: locale === 'pl' ? 'Rejestr NIP niedostępny' : 'NIP registry unavailable',
+      className: nipStatusStyles.missing,
     };
   }
   return {
@@ -160,6 +175,9 @@ function dueDiligenceDecision(
   const delta7d = company.momentum_7d?.delta ?? 0;
   const sanctionsStatus = company.sanctions?.status;
   const nipStatus = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
+  const nipRegistryStatus = company.nip_check?.registry_status;
+  const evidenceArticles = company.evidence_quality?.articles_count ?? 0;
+  const evidenceScore = company.evidence_quality?.score ?? 0;
 
   if (company.sanctions?.is_sanctioned || sanctionsStatus === 'listed') {
     return {
@@ -189,7 +207,7 @@ function dueDiligenceDecision(
     };
   }
 
-  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3 || nipStatus === 'invalid' || nipStatus === 'missing') {
+  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3 || nipStatus === 'invalid' || nipStatus === 'missing' || (nipStatus === 'valid' && nipRegistryStatus !== 'verified') || evidenceArticles <= 0 || evidenceScore < 40) {
     return {
       level: 'review',
       label: 'REVIEW',
@@ -204,6 +222,14 @@ function dueDiligenceDecision(
             ? locale === 'pl' ? 'NIP ma niepoprawny format lub sumę kontrolną.' : 'NIP format or checksum is invalid.'
             : nipStatus === 'missing'
               ? locale === 'pl' ? 'Brak NIP ogranicza identyfikację podmiotu.' : 'Missing NIP limits entity identification.'
+              : nipStatus === 'valid' && nipRegistryStatus === 'not_found'
+                ? locale === 'pl' ? 'Publiczny rejestr MF nie potwierdził tego NIP.' : 'The public MF registry did not confirm this NIP.'
+                : nipStatus === 'valid' && nipRegistryStatus === 'unavailable'
+                  ? locale === 'pl' ? 'Publiczny rejestr MF był niedostępny podczas sprawdzenia.' : 'The public MF registry was unavailable during verification.'
+                  : evidenceArticles <= 0
+                    ? locale === 'pl' ? 'Brak materiału dowodowego online dla tego podmiotu.' : 'No online evidence was found for this entity.'
+                    : evidenceScore < 40
+                      ? locale === 'pl' ? 'Niska jakość dowodów wymaga ręcznego potwierdzenia.' : 'Low evidence quality requires manual confirmation.'
               : locale === 'pl' ? `Sygnały ryzyka w oknie analizy: ${mediumSignalCount}.` : `Risk signals in the selected window: ${mediumSignalCount}.`,
       ],
     };
@@ -423,11 +449,21 @@ export default function CompanyDetailPage() {
   const backendDrop = momentum7d && momentum7d.delta <= -20 ? Math.abs(momentum7d.delta) : undefined;
   const showAlert = backendDrop != null || fallbackAlert.show;
   const scoreDelta = backendDrop ?? fallbackAlert.delta;
-  const aliases = company.aliases ?? [];
-  const decision = dueDiligenceDecision(company, articles, locale);
-  const decisionStyle = decisionStyles[decision.level];
-  const nipView = nipStatusView(company, locale);
-  const evidenceView = evidenceQualityView(company, locale);
+   const aliases = company.aliases ?? [];
+   
+   // Use backend decision if available, otherwise fallback to client-side calculation
+   let decision = company.decision
+     ? {
+         level: company.decision.level as DecisionLevel,
+         label: company.decision.level.toUpperCase(),
+         title: company.decision.title,
+         reasons: company.decision.reasons,
+       }
+     : dueDiligenceDecision(company, articles, locale);
+    const decisionStyle = decisionStyles[decision.level];
+   const nipView = nipStatusView(company, locale);
+   const evidenceView = evidenceQualityView(company, locale);
+   const displayScore = (evidenceView.score < 40 ? 0 : company.current_score);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -483,11 +519,19 @@ export default function CompanyDetailPage() {
                     </div>
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{t.card.nip}</div>
-                      <div className="gov-meta-value font-mono tnum flex flex-wrap items-center gap-2">
-                        <span>{company.nip ?? '—'}</span>
-                        <span className={`px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${nipView.className}`}>
-                          {nipView.label}
-                        </span>
+                      <div className="gov-meta-value font-mono tnum space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{company.nip ?? '—'}</span>
+                          <span className={`px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${nipView.className}`}>
+                            {nipView.label}
+                          </span>
+                        </div>
+                        {company.nip_check?.registry_name && (
+                          <p className="text-[11px] text-[var(--ink-muted)]">
+                            {locale === 'pl' ? 'Rejestr MF' : 'MF registry'}: {company.nip_check.registry_name}
+                            {company.nip_check.registry_vat_status ? ` · ${company.nip_check.registry_vat_status}` : ''}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="gov-meta-row sm:block">
@@ -634,6 +678,33 @@ export default function CompanyDetailPage() {
               </div>
             </section>
 
+            {(company.evidence_quality?.articles_count ?? 0) <= 0 && (
+              <section
+                className="p-6 border"
+                style={{
+                  borderColor: 'var(--risk-medium-rule)',
+                  background: 'var(--risk-medium-bg)',
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl" aria-hidden="true">!</span>
+                  <div className="flex-1">
+                    <h3
+                      className="font-extrabold text-lg mb-2 uppercase tracking-[0.04em]"
+                      style={{ color: 'var(--risk-medium)' }}
+                    >
+                      {locale === 'pl' ? 'BRAK POTWIERDZONEGO MATERIAŁU ONLINE' : 'NO CONFIRMED ONLINE EVIDENCE'}
+                    </h3>
+                    <p className="text-sm text-[var(--ink-2)]">
+                      {locale === 'pl'
+                        ? 'Scoring 100/100 oznacza brak negatywnych sygnałów w dostępnych danych, a nie potwierdzenie niskiego ryzyka. Podmiot wymaga ręcznej weryfikacji.'
+                        : 'A 100/100 score means no negative signals were found in available data, not confirmed low risk. This entity requires manual review.'}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+
             <section className="gov-panel">
               <div className="gov-section-header">
                 <span>{locale === 'pl' ? 'Rejestr nazw i identyfikatorów' : 'Names and identifiers registry'}</span>
@@ -764,21 +835,21 @@ export default function CompanyDetailPage() {
               <div className="gov-panel grid grid-cols-1 lg:grid-cols-5 gap-0">
                 <div className="p-6 lg:col-span-2 lg:border-r border-b lg:border-b-0 border-[var(--border)]">
                   <p className="eyebrow mb-3">{t.detail.currentScore}</p>
-                  <p
-                    className="text-[64px] font-semibold tnum leading-none tracking-tight"
-                    style={{ color: riskColor }}
-                  >
-                    {formatScore(company.current_score)}
-                    <span className="text-2xl font-medium text-[var(--ink-faint)] ml-1">
-                      {t.card.scoreOutOf}
-                    </span>
-                  </p>
-                  <div className="h-1.5 w-full bg-[var(--paper-2)] border border-[var(--rule)] mt-4">
-                    <div
-                      className="h-full transition-[width] duration-700 ease-out"
-                      style={{ width: `${Math.max(0, Math.min(100, company.current_score))}%`, background: riskColor }}
-                    />
-                  </div>
+                   <p
+                     className="text-[64px] font-semibold tnum leading-none tracking-tight"
+                     style={{ color: riskColor }}
+                   >
+                     {formatScore(displayScore)}
+                     <span className="text-2xl font-medium text-[var(--ink-faint)] ml-1">
+                       {t.card.scoreOutOf}
+                     </span>
+                   </p>
+                   <div className="h-1.5 w-full bg-[var(--paper-2)] border border-[var(--rule)] mt-4">
+                     <div
+                       className="h-full transition-[width] duration-700 ease-out"
+                       style={{ width: `${Math.max(0, Math.min(100, displayScore))}%`, background: riskColor }}
+                     />
+                   </div>
                   <p className="text-[12px] text-[var(--ink-2)] mt-3">
                     <span className="font-semibold uppercase tracking-[0.08em] text-[10px] mr-1.5" style={{ color: riskColor }}>
                       ●
