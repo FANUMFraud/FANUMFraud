@@ -125,6 +125,7 @@ class LiveCompanySearchResponse(BaseModel):
     articles_skipped: int
     status: str
     company: CompanyResponse
+    nip_extracted: str | None = None
 
 
 class ScorePoint(BaseModel):

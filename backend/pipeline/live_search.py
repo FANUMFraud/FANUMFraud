@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from analyzer import ArticleAnalyzer, ArticleInput
 from database import SessionLocal
 from elastic import index_company
+from identifiers import validate_nip
 from models import Article, Company, ScoreHistory
 from pipeline.ingest import contains_risk_keywords
 from pipeline.processor import _as_db_datetime, _build_signal, _compute_company_score, _pick_category
@@ -124,6 +125,7 @@ def run_live_company_search(
                 stats["articles_saved"] += 1
 
         scorer = ReputationScorer(half_life_days=45)
+        relevant_articles: list[Article] = []
         for article in articles:
             if not force_refresh and _has_company_score(db, company.id, article.id):
                 stats["articles_skipped"] += 1
@@ -135,8 +137,16 @@ def run_live_company_search(
 
             score_created = _score_live_article(db, company, article, scorer)
             article.processed = True
+            relevant_articles.append(article)
             if score_created:
                 stats["articles_scored"] += 1
+
+        if not company.nip:
+            extracted = _extract_nip_from_articles(relevant_articles)
+            if extracted is not None:
+                if not db.query(Company).filter(Company.nip == extracted, Company.id != company.id).first():
+                    company.nip = extracted
+                    stats["nip_extracted"] = extracted
 
         db.commit()
         try:
@@ -351,6 +361,31 @@ def _has_corporate_cue(haystack: str) -> bool:
 def _ascii_fold(value: str) -> str:
     decomposed = unicodedata.normalize("NFKD", value)
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+
+
+_NIP_LABELED_PATTERN = re.compile(
+    r"NIP[\s:\-]*((?:\d[\s\-]?){9}\d)",
+    re.IGNORECASE,
+)
+
+
+def _extract_nip_from_articles(articles: list[Article]) -> str | None:
+    """Find a checksum-valid NIP that appears across the article corpus.
+
+    Looks for the labeled form ("NIP: 525-000-00-15"); the bare 10-digit
+    form is too noisy in news text to use safely.
+    """
+    counts: dict[str, int] = {}
+    for article in articles:
+        haystack = f"{article.title or ''}\n{article.content or ''}"
+        for match in _NIP_LABELED_PATTERN.finditer(haystack):
+            digits = re.sub(r"\D+", "", match.group(1))
+            if len(digits) != 10 or not validate_nip(digits):
+                continue
+            counts[digits] = counts.get(digits, 0) + 1
+    if not counts:
+        return None
+    return max(counts.items(), key=lambda kv: kv[1])[0]
 
 
 def _company_aliases(company: Company) -> list[str]:

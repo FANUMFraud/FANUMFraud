@@ -123,7 +123,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
       emptySubtitle: 'Trwa synchronizacja rejestru online. Odśwież widok za chwilę.',
     },
     search: {
-      placeholder: 'Szukaj firmy po nazwie lub NIP…',
+      placeholder: 'Szukaj firmy po nazwie…',
       noResults: (q) => `Brak wyników dla „${q}”.`,
       hint: 'Co najmniej 2 znaki',
       liveAction: 'Sprawdź online',
@@ -211,7 +211,7 @@ export const DICTIONARIES: Record<Locale, Dictionary> = {
       emptySubtitle: 'Online registry sync is in progress. Refresh in a moment.',
     },
     search: {
-      placeholder: 'Search by name or VAT number…',
+      placeholder: 'Search by name…',
       noResults: (q) => `No results for “${q}”.`,
       hint: 'At least 2 characters',
       liveAction: 'Check online',
