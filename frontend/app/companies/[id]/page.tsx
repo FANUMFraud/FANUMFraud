@@ -207,7 +207,7 @@ function dueDiligenceDecision(
     };
   }
 
-  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3 || nipStatus === 'invalid' || nipStatus === 'missing' || (nipStatus === 'valid' && nipRegistryStatus !== 'verified') || evidenceArticles <= 0 || evidenceScore < 40) {
+  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3 || nipStatus === 'invalid' || nipStatus === 'missing' || (nipStatus === 'valid' && nipRegistryStatus === 'not_found') || evidenceArticles <= 0 || evidenceScore < 40) {
     return {
       level: 'review',
       label: 'REVIEW',

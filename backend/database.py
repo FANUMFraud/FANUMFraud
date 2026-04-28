@@ -31,6 +31,32 @@ class Base(DeclarativeBase):
     pass
 
 
+_LIGHTWEIGHT_MIGRATIONS: tuple[tuple[str, str, str], ...] = (
+    ("companies", "nip_registry_status", "VARCHAR(32)"),
+    ("companies", "nip_registry_name", "VARCHAR(512)"),
+    ("companies", "nip_registry_vat_status", "VARCHAR(64)"),
+    ("companies", "nip_registry_source", "VARCHAR(64)"),
+    ("companies", "nip_registry_checked_at", "TIMESTAMP"),
+    ("companies", "nip_registry_reason", "VARCHAR(512)"),
+)
+
+
+def _apply_lightweight_migrations() -> None:
+    """Add columns introduced after initial schema, idempotently."""
+    from sqlalchemy import inspect
+
+    inspector = inspect(engine)
+    for table, column, ddl_type in _LIGHTWEIGHT_MIGRATIONS:
+        if not inspector.has_table(table):
+            continue
+        existing = {col["name"] for col in inspector.get_columns(table)}
+        if column in existing:
+            continue
+        with engine.begin() as conn:
+            conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {column} {ddl_type}'))
+        logger.info("✓ Added column %s.%s", table, column)
+
+
 def init_db() -> None:
     """
     Inicjalizacja bazy danych - tworzenie wszystkich tabel.
@@ -42,6 +68,7 @@ def init_db() -> None:
 
         logger.info("Tworzenie tabel w bazie danych...")
         Base.metadata.create_all(bind=engine)
+        _apply_lightweight_migrations()
         logger.info("✓ Baza danych zainicjalizowana pomyślnie")
 
     except OperationalError as e:

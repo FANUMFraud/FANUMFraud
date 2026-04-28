@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from analyzer import detect_article_language
 from database import get_db
 from elastic import index_company, search_companies
-from identifiers import nip_check, normalize_nip
+from identifiers import ensure_nip_registry, merge_nip_check, nip_check, normalize_nip
 from models import Article, Company, ScoreHistory
 from pipeline.company_registry import sync_companies_from_registry
 from pipeline.live_search import run_live_company_search
@@ -117,7 +117,7 @@ def live_company_search(
 
     return LiveCompanySearchResponse(
         **stats,
-        company=_company_response(company, db),
+        company=_company_response(company, db, refresh_registry=True),
     )
 
 
@@ -155,8 +155,8 @@ def get_company(company_id: int, db: Session = Depends(get_db)):
     company = db.query(Company).get(company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
-    response = _company_response(company, db)
-    
+    response = _company_response(company, db, refresh_registry=True)
+
     # DODANE: Pobierz aktualną cenę akcji
     if company.ticker_gpw:
         try:
@@ -206,9 +206,21 @@ def get_company_score(
     )
 
 
-def _company_response(company: Company, db: Session) -> CompanyResponse:
+def _company_response(
+    company: Company,
+    db: Session,
+    *,
+    refresh_registry: bool = False,
+) -> CompanyResponse:
     sanctions = check_sanctions(company.name, company.nip)
-    nip_check_data = nip_check(company.nip)
+    checksum_check = nip_check(company.nip)
+    if checksum_check["status"] == "valid":
+        registry_data = ensure_nip_registry(
+            db, company, allow_remote=refresh_registry
+        )
+    else:
+        registry_data = None
+    nip_check_data = merge_nip_check(checksum_check, registry_data)
     evidence_quality_obj = _evidence_quality(db, company.id)
     momentum_7d = _risk_momentum(db, company.id, company.current_score, 7)
     momentum_30d = _risk_momentum(db, company.id, company.current_score, 30)
@@ -535,12 +547,15 @@ def _due_diligence_decision(
             ],
         }
 
+    registry_blocks_decision = (
+        nip_status == "valid" and nip_registry_status == "not_found"
+    )
     if (
         current_score < 75.0
         or delta_7d <= -5.0
         or (sanctions and sanctions.get("status") == "unavailable")
         or nip_status in {"missing", "invalid"}
-        or (nip_status == "valid" and nip_registry_status != "verified")
+        or registry_blocks_decision
         or evidence_articles <= 0
         or evidence_score < 40.0
     ):
@@ -553,10 +568,10 @@ def _due_diligence_decision(
             reasons.append("NIP checksum or format is invalid.")
         if nip_status == "missing":
             reasons.append("NIP is missing, so entity identification is incomplete.")
-        if nip_status == "valid" and nip_registry_status == "not_found":
+        if registry_blocks_decision:
             reasons.append("The public MF VAT registry did not confirm this NIP.")
         elif nip_status == "valid" and nip_registry_status == "unavailable":
-            reasons.append("The public MF VAT registry was unavailable during verification.")
+            reasons.append("The public MF VAT registry was unavailable; status not confirmed.")
         if evidence_articles <= 0:
             reasons.append("No online evidence was found for this entity.")
         elif evidence_score < 40.0:
@@ -615,11 +630,19 @@ def export_company_report(
 
     evidence_quality = _evidence_quality(db, company.id).model_dump()
 
+    checksum_check = nip_check(company.nip)
+    registry_data = (
+        ensure_nip_registry(db, company, allow_remote=True)
+        if checksum_check["status"] == "valid"
+        else None
+    )
+    nip_check_combined = merge_nip_check(checksum_check, registry_data)
+
     decision = _due_diligence_decision(
         current_score=company.current_score,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         sanctions=sanctions_data,
-        nip_check_data=nip_check(company.nip),
+        nip_check_data=nip_check_combined,
         evidence_quality=evidence_quality,
         articles_count=articles_count,
         top_categories=top_categories,
@@ -630,7 +653,7 @@ def export_company_report(
         company_id=company.id,
         company_name=company.name,
         nip=company.nip,
-        nip_check=nip_check(company.nip),
+        nip_check=nip_check_combined,
         current_score=company.current_score,
         risk_level=risk_level,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
@@ -688,4 +711,4 @@ def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
     except Exception:
         logger.warning("Failed to index company id=%d in ES", company.id, exc_info=True)
 
-    return _company_response(company, db)
+    return _company_response(company, db, refresh_registry=True)

@@ -71,7 +71,7 @@ class ArticleSignal:
 DEMO_COMPANIES: list[DemoCompany] = [
     DemoCompany(
         name="Baltica Energy S.A.",
-        nip="1010000001",
+        nip="5250000015",
         aliases=["Baltica Energy", "Baltica", "BE S.A."],
         industry="energy",
         ticker="BET",
@@ -82,7 +82,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Vistula Logistics Sp. z o.o.",
-        nip="1010000002",
+        nip="5250000021",
         aliases=["Vistula Logistics", "V-Logistics", "VLOG"],
         industry="transport",
         ticker=None,
@@ -93,7 +93,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="NovaTech Solutions S.A.",
-        nip="1010000003",
+        nip="5250000038",
         aliases=["NovaTech", "NTS", "Nova Tech"],
         industry="technology",
         ticker="NTS",
@@ -104,7 +104,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="GreenFoods Polska Sp. z o.o.",
-        nip="1010000004",
+        nip="5250000044",
         aliases=["GreenFoods", "Green Foods Polska", "GFP"],
         industry="food",
         ticker=None,
@@ -115,7 +115,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Mazovia Construction S.A.",
-        nip="1010000005",
+        nip="5250000050",
         aliases=["Mazovia Construction", "Mazovia Budownictwo", "MCON"],
         industry="construction",
         ticker="MCON",
@@ -126,7 +126,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Amber Capital Markets S.A.",
-        nip="1010000006",
+        nip="5250000067",
         aliases=["Amber Capital", "ACM", "Amber Markets"],
         industry="finance",
         ticker="ACM",
@@ -137,7 +137,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Northwind Pharma Sp. z o.o.",
-        nip="1010000007",
+        nip="5250000073",
         aliases=["Northwind Pharma", "Northwind", "NWP"],
         industry="pharma",
         ticker=None,
@@ -148,7 +148,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Solaris Components S.A.",
-        nip="1010000008",
+        nip="5250000096",
         aliases=["Solaris Components", "Solaris Parts", "SCOMP"],
         industry="manufacturing",
         ticker="SCP",
@@ -159,7 +159,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Quantum Retail Group S.A.",
-        nip="1010000009",
+        nip="5250000104",
         aliases=["Quantum Retail", "Q Retail", "QRG"],
         industry="retail",
         ticker="QRG",
@@ -170,7 +170,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="Asteria Mining S.A.",
-        nip="1010000010",
+        nip="5250000110",
         aliases=["Asteria Mining", "Asteria", "AMIN"],
         industry="mining",
         ticker="AMN",
@@ -181,7 +181,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="BalticPay S.A.",
-        nip="1010000011",
+        nip="5250000127",
         aliases=["BalticPay", "Baltic Pay", "BPAY"],
         industry="payments",
         ticker="BPY",
@@ -192,7 +192,7 @@ DEMO_COMPANIES: list[DemoCompany] = [
     ),
     DemoCompany(
         name="HelioSoft Cloud Sp. z o.o.",
-        nip="1010000012",
+        nip="5250000133",
         aliases=["HelioSoft", "HelioSoft Cloud", "HSC"],
         industry="software",
         ticker=None,
@@ -425,6 +425,13 @@ def _upsert_company(db, config: DemoCompany) -> Company:
     company.industry = config.industry
     company.ticker_gpw = config.ticker
     company.current_score = 100.0
+
+    company.nip_registry_status = "verified"
+    company.nip_registry_name = config.name
+    company.nip_registry_vat_status = "Czynny"
+    company.nip_registry_source = "demo-seed"
+    company.nip_registry_checked_at = datetime.now(UTC).replace(tzinfo=None)
+    company.nip_registry_reason = None
     return company
 
 

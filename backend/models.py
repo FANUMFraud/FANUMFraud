@@ -21,6 +21,13 @@ class Company(Base):
     current_score = Column(Float, default=100.0)
     created_at = Column(DateTime, server_default=func.now())
 
+    nip_registry_status = Column(String(32), nullable=True)
+    nip_registry_name = Column(String(512), nullable=True)
+    nip_registry_vat_status = Column(String(64), nullable=True)
+    nip_registry_source = Column(String(64), nullable=True)
+    nip_registry_checked_at = Column(DateTime, nullable=True)
+    nip_registry_reason = Column(String(512), nullable=True)
+
 
 # Artykuł prasowy
 class Article(Base):
