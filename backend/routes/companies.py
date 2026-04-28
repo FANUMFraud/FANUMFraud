@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from analyzer import detect_article_language
 from database import get_db
 from elastic import index_company, search_companies
+from identifiers import nip_check, normalize_nip
 from models import Article, Company, ScoreHistory
 from pipeline.company_registry import sync_companies_from_registry
 from pipeline.live_search import run_live_company_search
@@ -208,6 +209,7 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         id=company.id,
         name=company.name,
         nip=company.nip,
+        nip_check=nip_check(company.nip),
         isin=company.isin,
         industry=company.industry,
         aliases=_company_aliases(company),
@@ -365,6 +367,7 @@ def _due_diligence_decision(
     current_score: float,
     momentum_7d: dict[str, Any] | None,
     sanctions: dict[str, Any] | None,
+    nip_status: str | None,
     articles_count: int,
     top_categories: list[dict[str, Any]] | None,
 ) -> dict[str, Any]:
@@ -391,12 +394,16 @@ def _due_diligence_decision(
             ],
         }
 
-    if current_score < 75.0 or delta_7d <= -5.0 or (sanctions and sanctions.get("status") == "unavailable"):
+    if current_score < 75.0 or delta_7d <= -5.0 or (sanctions and sanctions.get("status") == "unavailable") or nip_status in {"missing", "invalid"}:
         reasons = ["Manual review is required before onboarding or renewal."]
         if top_category:
             reasons.append(f"Dominant risk category: {top_category}.")
         if sanctions and sanctions.get("status") == "unavailable":
             reasons.append("Sanctions status has not been confirmed.")
+        if nip_status == "invalid":
+            reasons.append("NIP checksum or format is invalid.")
+        if nip_status == "missing":
+            reasons.append("NIP is missing, so entity identification is incomplete.")
         return {"level": "review", "title": "Manual review required", "reasons": reasons}
 
     return {
@@ -453,6 +460,7 @@ def export_company_report(
         current_score=company.current_score,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         sanctions=sanctions_data,
+        nip_status=str(nip_check(company.nip).get("status") or "missing"),
         articles_count=articles_count,
         top_categories=top_categories,
     )
@@ -462,6 +470,7 @@ def export_company_report(
         company_id=company.id,
         company_name=company.name,
         nip=company.nip,
+        nip_check=nip_check(company.nip),
         current_score=company.current_score,
         risk_level=risk_level,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
@@ -492,19 +501,20 @@ def export_company_report(
 @router.post("", response_model=CompanyResponse, status_code=201)
 def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
     """Register a new company and index it in Elasticsearch."""
+    normalized_nip = normalize_nip(payload.nip)
 
     # NIP uniqueness check
-    if payload.nip:
-        existing = db.query(Company).filter(Company.nip == payload.nip).first()
+    if normalized_nip:
+        existing = db.query(Company).filter(Company.nip == normalized_nip).first()
         if existing:
             raise HTTPException(
                 status_code=409,
-                detail=f"Company with NIP {payload.nip} already exists (id={existing.id})",
+                detail=f"Company with NIP {normalized_nip} already exists (id={existing.id})",
             )
 
     company = Company(
         name=payload.name,
-        nip=payload.nip,
+        nip=normalized_nip,
         aliases=json.dumps(payload.aliases, ensure_ascii=False),
         current_score=100.0,
     )
@@ -517,4 +527,4 @@ def create_company(payload: CompanyCreate, db: Session = Depends(get_db)):
     except Exception:
         logger.warning("Failed to index company id=%d in ES", company.id, exc_info=True)
 
-    return company
+    return _company_response(company, db)

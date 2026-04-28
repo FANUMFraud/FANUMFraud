@@ -31,6 +31,7 @@ export interface Company {
   id: number;
   name: string;
   nip?: string | null;
+  nip_check?: NipCheck | null;
   isin?: string | null;
   industry?: string | null;
   aliases?: string[];
@@ -44,6 +45,13 @@ export interface Company {
     price: number;
     change_percent: number;
   } | null;
+}
+
+export interface NipCheck {
+  status: 'valid' | 'invalid' | 'missing' | string;
+  valid: boolean;
+  normalized?: string | null;
+  reason?: string | null;
 }
 
 export interface LiveCompanySearchResponse {

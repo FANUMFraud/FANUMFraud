@@ -50,6 +50,7 @@ def generate_risk_report(
     company_id: int,
     company_name: str,
     nip: str | None,
+    nip_check: dict[str, Any] | None,
     current_score: float,
     risk_level: str,
     momentum_7d: dict[str, Any] | None,
@@ -75,6 +76,7 @@ def generate_risk_report(
             company_id=company_id,
             company_name=company_name,
             nip=nip,
+            nip_check=nip_check,
             current_score=current_score,
             risk_level=risk_level,
             momentum_7d=momentum_7d,
@@ -94,6 +96,7 @@ def _build_pdf(
     company_id: int,
     company_name: str,
     nip: str | None,
+    nip_check: dict[str, Any] | None,
     current_score: float,
     risk_level: str,
     momentum_7d: dict[str, Any] | None,
@@ -167,6 +170,7 @@ def _build_pdf(
         ["Current Score", f"{current_score:.2f} / 100"],
         ["Risk Level", risk_level.upper()],
         ["NIP", nip or "N/A"],
+        ["NIP Status", _nip_status_label(nip_check)],
         ["Associated Articles", str(articles_count)],
     ]
     summary_table = Table(summary_data, colWidths=[2 * inch, 2.5 * inch])
@@ -331,6 +335,16 @@ def _decision_to_color(decision_level: str) -> colors.Color:
     if normalized == "review":
         return RISK_MEDIUM_COLOR
     return RISK_LOW_COLOR
+
+
+def _nip_status_label(check: dict[str, Any] | None) -> str:
+    if not check:
+        return "UNKNOWN"
+    status = str(check.get("status") or "unknown").upper()
+    normalized = check.get("normalized")
+    if normalized:
+        return f"{status} ({normalized})"
+    return status
 
 
 __all__ = ["generate_risk_report"]

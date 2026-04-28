@@ -15,7 +15,7 @@ def _round_score(value: float | int | None) -> float:
 
 class CompanyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=512)
-    nip: str | None = Field(None, pattern=r"^\d{10}$")
+    nip: str | None = Field(None, max_length=32)
     aliases: list[str] = Field(default_factory=list)
 
 
@@ -55,12 +55,20 @@ class SanctionsCheck(BaseModel):
     reason: str | None = None
 
 
+class NipCheck(BaseModel):
+    status: str
+    valid: bool
+    normalized: str | None = None
+    reason: str | None = None
+
+
 class CompanyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
     nip: str | None
+    nip_check: NipCheck | None = None
     isin: str | None = None
     industry: str | None = None
     aliases: list[str] = Field(default_factory=list)

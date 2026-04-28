@@ -37,6 +37,12 @@ const sanctionsStyle = {
   unavailable: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
 } as const;
 
+const nipStyle = {
+  valid: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  invalid: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+} as const;
+
 function getSanctionsView(company: Company, locale: string) {
   if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
     return { label: locale === 'pl' ? 'Sankcje: na liście' : 'Sanctions: listed', className: sanctionsStyle.listed };
@@ -45,6 +51,17 @@ function getSanctionsView(company: Company, locale: string) {
     return { label: locale === 'pl' ? 'Sankcje: brak wpisu' : 'Sanctions: clear', className: sanctionsStyle.clear };
   }
   return { label: locale === 'pl' ? 'Sankcje: nie sprawdzono' : 'Sanctions: not checked', className: sanctionsStyle.unavailable };
+}
+
+function getNipView(company: Company, locale: string) {
+  const status = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
+  if (status === 'valid') {
+    return { label: locale === 'pl' ? 'NIP poprawny' : 'NIP valid', className: nipStyle.valid };
+  }
+  if (status === 'invalid') {
+    return { label: locale === 'pl' ? 'NIP błędny' : 'NIP invalid', className: nipStyle.invalid };
+  }
+  return { label: locale === 'pl' ? 'Brak NIP' : 'NIP missing', className: nipStyle.missing };
 }
 
 export default function CompanyCard({ company, animationDelay = 0 }: Props) {
@@ -65,6 +82,7 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
     low: t.card.riskLow,
   } as const;
   const sanctions = getSanctionsView(company, locale);
+  const nip = getNipView(company, locale);
 
   return (
     <Link
@@ -85,6 +103,9 @@ export default function CompanyCard({ company, animationDelay = 0 }: Props) {
               </h3>
               <div className="text-[11px] text-[var(--ink-muted)] font-mono mt-2 tnum flex flex-wrap gap-x-3 gap-y-1">
                 <span>{t.card.nip}: {company.nip ?? '—'}</span>
+                <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-[0.08em] font-extrabold ${nip.className}`}>
+                  {nip.label}
+                </span>
                 {company.ticker_gpw && (
                   <span className="text-[var(--ink-2)]">GPW: {company.ticker_gpw}</span>
                 )}

@@ -34,6 +34,12 @@ const sanctionsBadgeClass = {
   unavailable: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
 } as const;
 
+const nipBadgeClass = {
+  valid: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  invalid: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+} as const;
+
 function sanctionsStatus(company: Company, locale: string): { label: string; className: string } {
   if (company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed') {
     return { label: locale === 'pl' ? 'Na liście' : 'Listed', className: sanctionsBadgeClass.listed };
@@ -42,6 +48,17 @@ function sanctionsStatus(company: Company, locale: string): { label: string; cla
     return { label: locale === 'pl' ? 'Brak wpisu' : 'Clear', className: sanctionsBadgeClass.clear };
   }
   return { label: locale === 'pl' ? 'Nie sprawdzono' : 'Not checked', className: sanctionsBadgeClass.unavailable };
+}
+
+function nipStatus(company: Company, locale: string): { label: string; className: string } {
+  const status = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
+  if (status === 'valid') {
+    return { label: locale === 'pl' ? 'NIP OK' : 'NIP OK', className: nipBadgeClass.valid };
+  }
+  if (status === 'invalid') {
+    return { label: locale === 'pl' ? 'NIP błędny' : 'NIP invalid', className: nipBadgeClass.invalid };
+  }
+  return { label: locale === 'pl' ? 'Brak NIP' : 'NIP missing', className: nipBadgeClass.missing };
 }
 
 type DemoScenario = {
@@ -141,6 +158,7 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
               const momentumDirection = momentumTone(momentumDelta);
               const sourceIsDemo = isDemoCompany(company);
               const sanctions = sanctionsStatus(company, locale);
+              const nip = nipStatus(company, locale);
               return (
                 <tr key={company.id} className="hover:bg-[var(--surface-alt)] transition-colors">
                   <td className="px-4 py-3 min-w-[280px] border-r border-[var(--rule)]">
@@ -149,6 +167,9 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
                     </Link>
                     <div className="mt-1 flex items-center gap-3 text-[11px] text-[var(--ink-muted)] font-mono tnum">
                       <span>{nipLabel}: {company.nip ?? '—'}</span>
+                      <span className={`px-1.5 py-0.5 border text-[9px] uppercase tracking-[0.08em] font-extrabold ${nip.className}`}>
+                        {nip.label}
+                      </span>
                       <span>ID: {company.id}</span>
                     </div>
                   </td>

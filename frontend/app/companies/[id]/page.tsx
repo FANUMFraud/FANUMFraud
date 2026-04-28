@@ -85,6 +85,35 @@ const decisionStyles: Record<DecisionLevel, { border: string; background: string
   },
 };
 
+const nipStatusStyles = {
+  valid: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  invalid: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  missing: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+} as const;
+
+function nipStatusView(company: Company, locale: string) {
+  const status = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
+  if (status === 'valid') {
+    return {
+      status,
+      label: locale === 'pl' ? 'NIP poprawny' : 'NIP valid',
+      className: nipStatusStyles.valid,
+    };
+  }
+  if (status === 'invalid') {
+    return {
+      status,
+      label: locale === 'pl' ? 'NIP niepoprawny' : 'NIP invalid',
+      className: nipStatusStyles.invalid,
+    };
+  }
+  return {
+    status: 'missing',
+    label: locale === 'pl' ? 'Brak NIP' : 'NIP missing',
+    className: nipStatusStyles.missing,
+  };
+}
+
 function dueDiligenceDecision(
   company: Company,
   articles: Article[],
@@ -94,6 +123,7 @@ function dueDiligenceDecision(
   const mediumSignalCount = articles.filter((article) => (article.risk_score ?? 0) >= 25).length;
   const delta7d = company.momentum_7d?.delta ?? 0;
   const sanctionsStatus = company.sanctions?.status;
+  const nipStatus = company.nip_check?.status ?? (company.nip ? 'invalid' : 'missing');
 
   if (company.sanctions?.is_sanctioned || sanctionsStatus === 'listed') {
     return {
@@ -123,7 +153,7 @@ function dueDiligenceDecision(
     };
   }
 
-  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3) {
+  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3 || nipStatus === 'invalid' || nipStatus === 'missing') {
     return {
       level: 'review',
       label: 'REVIEW',
@@ -134,7 +164,11 @@ function dueDiligenceDecision(
           : locale === 'pl' ? 'Wykryto sygnały wymagające potwierdzenia.' : 'Detected signals require confirmation.',
         sanctionsStatus === 'unavailable'
           ? locale === 'pl' ? 'Nie potwierdzono statusu sankcyjnego.' : 'Sanctions status has not been confirmed.'
-          : locale === 'pl' ? `Sygnały ryzyka w oknie analizy: ${mediumSignalCount}.` : `Risk signals in the selected window: ${mediumSignalCount}.`,
+          : nipStatus === 'invalid'
+            ? locale === 'pl' ? 'NIP ma niepoprawny format lub sumę kontrolną.' : 'NIP format or checksum is invalid.'
+            : nipStatus === 'missing'
+              ? locale === 'pl' ? 'Brak NIP ogranicza identyfikację podmiotu.' : 'Missing NIP limits entity identification.'
+              : locale === 'pl' ? `Sygnały ryzyka w oknie analizy: ${mediumSignalCount}.` : `Risk signals in the selected window: ${mediumSignalCount}.`,
       ],
     };
   }
@@ -356,6 +390,7 @@ export default function CompanyDetailPage() {
   const aliases = company.aliases ?? [];
   const decision = dueDiligenceDecision(company, articles, locale);
   const decisionStyle = decisionStyles[decision.level];
+  const nipView = nipStatusView(company, locale);
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -411,7 +446,12 @@ export default function CompanyDetailPage() {
                     </div>
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{t.card.nip}</div>
-                      <div className="gov-meta-value font-mono tnum">{company.nip ?? '—'}</div>
+                      <div className="gov-meta-value font-mono tnum flex flex-wrap items-center gap-2">
+                        <span>{company.nip ?? '—'}</span>
+                        <span className={`px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${nipView.className}`}>
+                          {nipView.label}
+                        </span>
+                      </div>
                     </div>
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">GPW</div>
@@ -478,8 +518,8 @@ export default function CompanyDetailPage() {
                   </div>
                   <p className="text-sm text-[var(--ink-2)] mt-3 max-w-3xl leading-relaxed">
                     {locale === 'pl'
-                      ? 'Rekomendacja jest wyliczana deterministycznie z wyniku reputacji, trendu, sankcji oraz liczby sygnałów ryzyka w wybranym oknie.'
-                      : 'The recommendation is deterministically derived from reputation score, trend, sanctions, and risk signals in the selected window.'}
+                    ? 'Rekomendacja jest wyliczana deterministycznie z wyniku reputacji, trendu, sankcji, identyfikatora NIP oraz liczby sygnałów ryzyka w wybranym oknie.'
+                    : 'The recommendation is deterministically derived from reputation score, trend, sanctions, NIP identifier quality, and risk signals in the selected window.'}
                   </p>
                 </div>
                 <div className="lg:w-[420px] bg-[var(--surface)] border border-[var(--border)] p-4">
@@ -521,14 +561,21 @@ export default function CompanyDetailPage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 border border-[var(--border)]">
                   {[
-                    { label: t.card.nip, value: company.nip ?? '—' },
+                    { label: t.card.nip, value: company.nip_check?.normalized ?? company.nip ?? '—' },
+                    { label: locale === 'pl' ? 'Status NIP' : 'NIP status', value: nipView.label, className: nipView.className },
                     { label: 'ISIN', value: company.isin ?? '—' },
                     { label: 'GPW', value: company.ticker_gpw ?? '—' },
                     { label: locale === 'pl' ? 'Branża' : 'Industry', value: company.industry ?? '—' },
                   ].map((item) => (
                     <div key={item.label} className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{item.label}</div>
-                      <div className="gov-meta-value font-mono tnum">{item.value}</div>
+                      <div className="gov-meta-value font-mono tnum">
+                        {'className' in item ? (
+                          <span className={`px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${item.className}`}>
+                            {item.value}
+                          </span>
+                        ) : item.value}
+                      </div>
                     </div>
                   ))}
                 </div>
