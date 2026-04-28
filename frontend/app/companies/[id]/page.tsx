@@ -463,7 +463,13 @@ export default function CompanyDetailPage() {
     const decisionStyle = decisionStyles[decision.level];
    const nipView = nipStatusView(company, locale);
    const evidenceView = evidenceQualityView(company, locale);
-   const displayScore = (evidenceView.score < 40 ? 0 : company.current_score);
+   const evidenceArticleCount = company.evidence_quality?.articles_count ?? 0;
+   const insufficientEvidence = evidenceArticleCount === 0 || evidenceView.score < 40;
+   const displayScore = company.current_score;
+   const insufficientEvidenceLabel = locale === 'pl' ? 'Niewystarczające dane' : 'Insufficient data';
+   const insufficientEvidenceHint = locale === 'pl'
+     ? 'Scoring oparty jest na ograniczonym materiale dowodowym — wymagana ręczna weryfikacja.'
+     : 'Score is based on limited evidence — manual verification recommended.';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -836,8 +842,8 @@ export default function CompanyDetailPage() {
                 <div className="p-6 lg:col-span-2 lg:border-r border-b lg:border-b-0 border-[var(--border)]">
                   <p className="eyebrow mb-3">{t.detail.currentScore}</p>
                    <p
-                     className="text-[64px] font-semibold tnum leading-none tracking-tight"
-                     style={{ color: riskColor }}
+                     className={`text-[64px] font-semibold tnum leading-none tracking-tight ${insufficientEvidence ? 'opacity-60' : ''}`}
+                     style={{ color: insufficientEvidence ? 'var(--ink-muted)' : riskColor }}
                    >
                      {formatScore(displayScore)}
                      <span className="text-2xl font-medium text-[var(--ink-faint)] ml-1">
@@ -847,15 +853,36 @@ export default function CompanyDetailPage() {
                    <div className="h-1.5 w-full bg-[var(--paper-2)] border border-[var(--rule)] mt-4">
                      <div
                        className="h-full transition-[width] duration-700 ease-out"
-                       style={{ width: `${Math.max(0, Math.min(100, displayScore))}%`, background: riskColor }}
+                       style={{
+                         width: `${Math.max(0, Math.min(100, displayScore))}%`,
+                         background: insufficientEvidence ? 'var(--ink-muted)' : riskColor,
+                         opacity: insufficientEvidence ? 0.4 : 1,
+                       }}
                      />
                    </div>
-                  <p className="text-[12px] text-[var(--ink-2)] mt-3">
-                    <span className="font-semibold uppercase tracking-[0.08em] text-[10px] mr-1.5" style={{ color: riskColor }}>
-                      ●
-                    </span>
-                    {exposureLabels[risk]}
-                  </p>
+                  {insufficientEvidence ? (
+                    <div className="mt-3 inline-flex items-center gap-2 px-2 py-1 border text-[11px] font-semibold uppercase tracking-[0.08em]"
+                      style={{
+                        borderColor: 'var(--risk-medium-rule)',
+                        background: 'var(--risk-medium-bg)',
+                        color: 'var(--risk-medium)',
+                      }}>
+                      <span aria-hidden="true">!</span>
+                      {insufficientEvidenceLabel}
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-[var(--ink-2)] mt-3">
+                      <span className="font-semibold uppercase tracking-[0.08em] text-[10px] mr-1.5" style={{ color: riskColor }}>
+                        ●
+                      </span>
+                      {exposureLabels[risk]}
+                    </p>
+                  )}
+                  {insufficientEvidence && (
+                    <p className="text-[12px] text-[var(--ink-2)] mt-2 leading-snug">
+                      {insufficientEvidenceHint}
+                    </p>
+                  )}
                 </div>
 
                 <div className={`lg:col-span-3 grid ${company.stock_price ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>

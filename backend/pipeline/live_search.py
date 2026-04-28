@@ -4,6 +4,7 @@ import html
 import json
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import UTC, datetime, timezone
 from time import mktime
@@ -42,6 +43,28 @@ LIVE_RISK_TERMS = (
     "prosecutor",
 )
 
+_QUERY_NOISE_WORDS = frozenset(
+    {
+        "sperm", "semen", "blood", "water", "food", "fraud", "scam",
+        "test", "hello", "hi", "money", "love", "sex", "porn", "nude",
+        "drug", "drugs", "company", "corp", "inc", "ltd", "firma",
+        "spolka", "krew", "praca", "zdrowie", "halo", "witaj", "dom",
+        "auto", "kot", "pies", "oszustwo", "pieniadze", "pieniadz",
+        "covid", "war", "wojna", "news", "wiadomosci",
+    }
+)
+
+_CORPORATE_CONTEXT_CUES = (
+    " spolka ", " spolki ", " sp z o o ", " sp z oo ",
+    " sa ", " sk ", " ska ", " psa ",
+    " spoldzielnia ", " przedsiebiorstwo ",
+    " firma ", " firmy ", " grupa kapitalowa ",
+    " holding ", " konsorcjum ", " fundusz ",
+    " inc ", " ltd ", " llc ", " plc ", " corp ",
+    " gmbh ", " ag ", " holdings ", " group ",
+    " corporation ", " company ",
+)
+
 _ANALYZER = ArticleAnalyzer()
 
 
@@ -61,8 +84,14 @@ def run_live_company_search(
 ) -> dict:
     """Run an ad-hoc online due-diligence search for a user-provided company."""
     clean_query = _clean_query(query)
-    if len(clean_query) < 2:
-        raise ValueError("query must contain at least 2 characters")
+    if len(clean_query) < 3:
+        raise ValueError("query must contain at least 3 characters")
+    if _is_noise_query(clean_query):
+        raise ValueError(
+            "Query looks like a generic term, not a company name. "
+            "Provide a multi-word entity name or include a legal form "
+            "(e.g. 'Sp. z o.o.', 'S.A.', 'Inc')."
+        )
 
     limit = max(1, min(int(limit), 25))
     stats = {
@@ -268,8 +297,60 @@ def _has_company_score(db: Session, company_id: int, article_id: int) -> bool:
 
 def _mentions_company(article: Article, query: str, company: Company) -> bool:
     haystack = _normalize(f"{article.title or ''} {article.content or ''}")
-    names = [query, company.name, *_company_aliases(company)]
-    return any(_normalize(name) and _normalize(name) in haystack for name in names)
+    if not haystack:
+        return False
+    candidates = [
+        candidate
+        for candidate in (query, company.name, *_company_aliases(company))
+        if candidate and candidate.strip()
+    ]
+    has_corporate_context = _has_corporate_cue(haystack)
+    for candidate in candidates:
+        normalized = _normalize(candidate)
+        if not normalized or not _word_boundary_match(normalized, haystack):
+            continue
+        if _is_low_signal_candidate(candidate) and not has_corporate_context:
+            continue
+        return True
+    return False
+
+
+def _word_boundary_match(needle: str, haystack: str) -> bool:
+    pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
+    return re.search(pattern, haystack, flags=re.UNICODE) is not None
+
+
+def _is_low_signal_candidate(candidate: str) -> bool:
+    cleaned = (candidate or "").strip()
+    if not cleaned or " " in cleaned:
+        return False
+    if any(ch in cleaned for ch in ".&-"):
+        return False
+    if any(ch.isupper() for ch in cleaned):
+        return False
+    return _ascii_fold(cleaned).lower() in _QUERY_NOISE_WORDS
+
+
+def _is_noise_query(query: str) -> bool:
+    cleaned = (query or "").strip()
+    if not cleaned or " " in cleaned:
+        return False
+    if any(ch in cleaned for ch in ".&-"):
+        return False
+    return _ascii_fold(cleaned).lower() in _QUERY_NOISE_WORDS
+
+
+def _has_corporate_cue(haystack: str) -> bool:
+    folded = _ascii_fold(haystack).replace(".", "")
+    stripped = re.sub(r"[^\w\s]", " ", folded)
+    stripped = re.sub(r"\s+", " ", stripped).strip()
+    padded = f" {stripped} "
+    return any(cue in padded for cue in _CORPORATE_CONTEXT_CUES)
+
+
+def _ascii_fold(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
 def _company_aliases(company: Company) -> list[str]:
