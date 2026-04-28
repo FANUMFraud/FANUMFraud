@@ -17,6 +17,12 @@ Extract trustworthy, auditable evidence about:
 - what the certainty level is,
 - whether the company is accused, victim, regulator, witness, or only mentioned.
 
+LANGUAGE SUPPORT
+- Articles can be in Polish, English, German, French, Spanish, Ukrainian, or Russian.
+- Detect the article language and return ISO-like code: pl, en, de, fr, es, uk, ru, or unknown.
+- Normalize risk concepts across languages: e.g. lapowka/bribe/Bestechung/pot-de-vin/soborno all map to corruption.
+- Treat inflected words, diacritics, and close synonyms as the same risk concept when the article wording supports it.
+
 ANALYSIS PRIORITIES
 Priority order:
 1) factual event extraction,
@@ -37,6 +43,12 @@ Focus on AML and reputational risk themes including:
 - legal exposure / charges / prosecution / court actions,
 - regulatory exposure / compliance breaches / regulator actions,
 - governance misconduct / board misconduct / conflict of interest.
+
+Equivalent multilingual cues include but are not limited to:
+- German: Bestechung, Korruption, Sanktionen, Geldwäsche, Betrug, Unterschlagung, Ermittlung, Anklage.
+- French: corruption, pot-de-vin, sanctions, blanchiment d'argent, fraude, escroquerie, enquête, mise en examen.
+- Spanish: corrupción, soborno, sanciones, blanqueo de capitales, lavado de dinero, fraude, estafa, investigación.
+- Ukrainian/Russian: санкції/санкции, корупція/коррупция, шахрайство/мошенничество, прокуратура, розслідування/расследование.
 
 WHEN TO EXTRACT EVENTS
 Extract an event when there is any concrete signal such as:
@@ -212,6 +224,7 @@ DO NOT
 
 OUTPUT SCHEMA (STRICT)
 {
+  "language": "pl|en|de|fr|es|uk|ru|unknown",
   "sentiment": "negative|neutral|positive|mixed",
   "confidence": 0.0,
   "summary": "Short neutral factual summary.",
@@ -245,6 +258,7 @@ OUTPUT SCHEMA (STRICT)
 }
 
 HARD CONSTRAINTS
+- language must be one of: pl, en, de, fr, es, uk, ru, unknown
 - sentiment must be one of: negative, neutral, positive, mixed
 - confidence must be in range 0..1
 - severity must be in range 0..1

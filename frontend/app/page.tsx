@@ -44,6 +44,56 @@ function sanctionsStatus(company: Company, locale: string): { label: string; cla
   return { label: locale === 'pl' ? 'Nie sprawdzono' : 'Not checked', className: sanctionsBadgeClass.unavailable };
 }
 
+type DemoScenario = {
+  key: string;
+  title: string;
+  description: string;
+  company?: Company;
+  tone: 'high' | 'medium' | 'low';
+};
+
+function pickDemoScenarios(companies: Company[], locale: string): DemoScenario[] {
+  const withHistory = companies.filter((company) => company.momentum_7d || company.momentum_30d);
+  const sanctioned = companies.find((company) => company.sanctions?.is_sanctioned || company.sanctions?.status === 'listed');
+  const worst = [...withHistory].sort((a, b) => a.current_score - b.current_score)[0];
+  const clean = [...withHistory]
+    .filter((company) => !company.sanctions?.is_sanctioned)
+    .sort((a, b) => b.current_score - a.current_score)[0];
+  const declining = [...withHistory].sort((a, b) => (a.momentum_7d?.delta ?? 0) - (b.momentum_7d?.delta ?? 0))[0];
+
+  const scenarios: DemoScenario[] = [
+    {
+      key: 'sanctions',
+      title: locale === 'pl' ? 'Sankcje i blokada' : 'Sanctions and block',
+      description: locale === 'pl' ? 'Pokazuje twardy sygnał compliance i rekomendację BLOCK.' : 'Shows a hard compliance signal and BLOCK recommendation.',
+      company: sanctioned,
+      tone: 'high',
+    },
+    {
+      key: 'shock',
+      title: locale === 'pl' ? 'Szok reputacyjny' : 'Reputation shock',
+      description: locale === 'pl' ? 'Najgorszy scoring w rejestrze i materiały dowodowe.' : 'Worst score in the registry with supporting evidence.',
+      company: worst,
+      tone: 'high',
+    },
+    {
+      key: 'trend',
+      title: locale === 'pl' ? 'Trend 7 dni' : '7-day trend',
+      description: locale === 'pl' ? 'Firma z największym pogorszeniem lub zmianą momentum.' : 'Company with the strongest deterioration or momentum change.',
+      company: declining,
+      tone: 'medium',
+    },
+    {
+      key: 'clean',
+      title: locale === 'pl' ? 'Czysty baseline' : 'Clean baseline',
+      description: locale === 'pl' ? 'Wysoki scoring, brak sankcji, rekomendacja PROCEED.' : 'High score, no sanctions, PROCEED recommendation.',
+      company: clean,
+      tone: 'low',
+    },
+  ];
+  return scenarios.filter((scenario) => scenario.company);
+}
+
 interface RegistrySectionProps {
   title: string;
   companies: Company[];
@@ -218,6 +268,7 @@ export default function DashboardPage() {
     medium: t.card.riskMedium,
     low: t.card.riskLow,
   } as const;
+  const demoScenarios = pickDemoScenarios(companies, locale);
 
   const today = new Date();
 
@@ -328,6 +379,47 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   ))}
+                </div>
+              </section>
+            )}
+
+            {!loading && !error && demoScenarios.length > 0 && (
+              <section>
+                <h2 className="section-title">
+                  {locale === 'pl' ? 'Scenariusze demo dla jury' : 'Guided jury demo scenarios'}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-0 border border-[var(--border)] bg-[var(--surface)]">
+                  {demoScenarios.map((scenario, index) => {
+                    const company = scenario.company;
+                    if (!company) return null;
+                    const risk = getRiskLevel(company.current_score);
+                    return (
+                      <Link
+                        key={scenario.key}
+                        href={`/companies/${company.id}`}
+                        className={`no-underline p-5 hover:bg-[var(--surface-alt)] transition-colors ${
+                          index !== demoScenarios.length - 1 ? 'border-b md:border-b-0 md:border-r border-[var(--border)]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                          <span className={`px-2 py-1 border text-[10px] uppercase tracking-[0.08em] font-extrabold ${riskBadgeClass[scenario.tone]}`}>
+                            {scenario.title}
+                          </span>
+                          <span className="font-mono tnum text-[12px] text-[var(--ink-muted)]">#{company.id}</span>
+                        </div>
+                        <p className="font-extrabold text-[var(--ink)] leading-snug">{company.name}</p>
+                        <p className="text-sm text-[var(--ink-2)] mt-2 leading-relaxed">{scenario.description}</p>
+                        <div className="mt-4 flex items-center justify-between text-[12px]">
+                          <span className="font-extrabold tnum" style={{ color: `var(--risk-${risk})` }}>
+                            {formatScore(company.current_score)}/100
+                          </span>
+                          <span className="text-[var(--ink-muted)]">
+                            {locale === 'pl' ? 'Otwórz kartę' : 'Open record'}
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </section>
             )}

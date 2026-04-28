@@ -20,7 +20,7 @@ except ImportError:  # pragma: no cover - dependency guard for local dev
 
 log = logging.getLogger(__name__)
 
-OPENSANCTIONS_SEARCH_URL = "https://api.opensanctions.org/search/default"
+OPENSANCTIONS_SEARCH_URL = "https://api.opensanctions.org/search/sanctions"
 OPENSANCTIONS_API_KEY = os.getenv("OPENSANCTIONS_API_KEY", "").strip()
 
 DEMO_SANCTIONED_NIPS = {

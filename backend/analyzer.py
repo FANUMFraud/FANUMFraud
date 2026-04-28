@@ -90,8 +90,8 @@ DEFAULT_PROMPT_PATH = (
     Path(__file__).resolve().parent / "prompts" / "analyze_article.txt"
 )
 DEFAULT_OPENROUTER_URL = "https://openrouter.ai/api/v1"
-DETERMINISTIC_ALGORITHM_VERSION = "deterministic-risk-v2.1"
-ANALYZER_PARSER_VERSION = "article-risk-v2.1"
+DETERMINISTIC_ALGORITHM_VERSION = "deterministic-risk-v2.2"
+ANALYZER_PARSER_VERSION = "article-risk-v2.2"
 
 
 class SentimentLabel(str, Enum):
@@ -210,6 +210,7 @@ class ArticleRiskAnalysis(BaseModel):
     risk_score: float = Field(default=0.0, ge=0.0, le=100.0)
     risk_level: RiskLevel = RiskLevel.low
     sentiment: SentimentLabel = SentimentLabel.neutral
+    language: str = "unknown"
     confidence: float = Field(default=0.4, ge=0.0, le=1.0)
     summary: str = ""
     risk_keywords: list[RiskKeyword] = Field(default_factory=list)
@@ -335,6 +336,13 @@ class ArticleAnalyzer:
             payload.get("events") or payload.get("risk_events") or []
         )[:5]
         article_text = f"{article.title}\n{article.content}".strip()
+        language = _normalize_language(
+            payload.get("language")
+            or payload.get("detected_language")
+            or payload.get("language_hint")
+            or article.language_hint
+            or detect_article_language(article_text)
+        )
         companies = self._normalize_companies(
             payload.get("companies_mentioned") or payload.get("companies") or [],
             article.candidate_companies,
@@ -386,6 +394,7 @@ class ArticleAnalyzer:
         normalized: dict[str, Any] = {
             "risk_score": _clamp(risk_score, 0.0, 100.0),
             "sentiment": normalized_sentiment,
+            "language": language,
             "confidence": confidence,
             "summary": summary,
             "risk_keywords": risk_keywords,
@@ -586,6 +595,7 @@ class ArticleAnalyzer:
     ) -> ArticleRiskAnalysis:
         text_original = f"{article.title}\n{article.content}".strip()
         lowered = _to_ascii_lower(text_original)
+        language = _normalize_language(article.language_hint or detect_article_language(text_original))
 
         category_hits: dict[str, float] = {}
         keyword_rows: list[dict[str, Any]] = []
@@ -707,6 +717,7 @@ class ArticleAnalyzer:
         return ArticleRiskAnalysis(
             risk_score=risk_score,
             sentiment=sentiment,
+            language=language,
             confidence=confidence,
             summary=summary,
             risk_keywords=keyword_rows,
@@ -750,6 +761,37 @@ def parse_analysis_payload(raw_text: str) -> dict[str, Any]:
         return extracted
 
     raise ValueError("Could not parse JSON object from model output.")
+
+
+def detect_article_language(text: str) -> str:
+    """Lightweight language detector for AML/news text used in audit output."""
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return "unknown"
+
+    ascii_text = _to_ascii_lower(raw)
+    scores: dict[str, int] = {code: 0 for code in LANGUAGE_MARKERS}
+    for code, patterns in LANGUAGE_MARKERS.items():
+        for pattern in patterns:
+            scores[code] += len(re.findall(pattern, ascii_text, flags=re.IGNORECASE))
+
+    if re.search(r"[ąćęłńóśźż]", raw):
+        scores["pl"] += 3
+    if re.search(r"[äöüß]", raw):
+        scores["de"] += 3
+    if re.search(r"[àâçèéêëîïôùûüÿœæ]", raw):
+        scores["fr"] += 2
+    if re.search(r"[áéíñóúü]", raw):
+        scores["es"] += 2
+    if re.search(r"[іїєґ]", raw):
+        scores["uk"] += 3
+    if re.search(r"[а-яё]", raw) and scores["uk"] == 0:
+        scores["ru"] += 2
+
+    code, score = max(scores.items(), key=lambda item: item[1])
+    if score <= 0:
+        return "unknown"
+    return code
 
 
 def risk_level_from_score(score: float) -> RiskLevel:
@@ -906,6 +948,7 @@ def _deterministic_risk_score(
     )
     breakdown: dict[str, Any] = {
         "version": DETERMINISTIC_ALGORITHM_VERSION,
+        "language": detect_article_language(article_text),
         "core_points": core_points,
         "keyword_points": total_keyword_points,
         "event_points": total_event_points,
@@ -1339,16 +1382,16 @@ def _normalize_company_role(value: Any) -> str:
         return CompanyRole.mentioned.value
     if label in COMPANY_ROLE_ALIASES:
         return COMPANY_ROLE_ALIASES[label]
-    if any(term in label for term in ["oskar", "accus", "charged", "suspect"]):
+    if any(term in label for term in ["oskar", "accus", "charged", "suspect", "angeklag", "beschuld", "mis en examen", "acusad", "sospech"]):
         return CompanyRole.accused.value
-    if any(term in label for term in ["victim", "pokrzywd", "poszkod"]):
+    if any(term in label for term in ["victim", "pokrzywd", "poszkod", "opfer", "victime", "victima"]):
         return CompanyRole.victim.value
     if any(
         term in label
-        for term in ["regulator", "urzad", "prokuratur", "watchdog", "authority"]
+        for term in ["regulator", "urzad", "prokuratur", "watchdog", "authority", "aufsicht", "autorite", "autoridad"]
     ):
         return CompanyRole.regulator.value
-    if any(term in label for term in ["witness", "swiadk"]):
+    if any(term in label for term in ["witness", "swiadk", "zeuge", "temoin", "testigo"]):
         return CompanyRole.witness.value
     if any(term in label for term in ["unknown", "nieznan"]):
         return CompanyRole.unknown.value
@@ -1363,28 +1406,28 @@ def _normalize_event_category(value: Any) -> str:
         return EVENT_CATEGORY_ALIASES[label]
     if any(
         term in label
-        for term in ["money laundering", "aml", "pran", "terror financing"]
+        for term in ["money laundering", "aml", "pran", "terror financing", "geldwasch", "blanchiment", "blanqueo", "lavado"]
     ):
         return EventCategory.money_laundering.value
-    if any(term in label for term in ["corrupt", "bribe", "lapow", "kickback"]):
+    if any(term in label for term in ["corrupt", "bribe", "lapow", "kickback", "bestech", "soborn"]):
         return EventCategory.corruption.value
     if any(term in label for term in ["sanction", "embargo", "ofac", "sankcj"]):
         return EventCategory.sanctions.value
-    if any(term in label for term in ["fraud", "oszust", "wylud", "scam", "ponzi"]):
+    if any(term in label for term in ["fraud", "oszust", "wylud", "scam", "ponzi", "betrug", "escroquer", "estaf"]):
         return EventCategory.fraud.value
-    if any(term in label for term in ["embezz", "malwers", "defraud", "sprzeniew"]):
+    if any(term in label for term in ["embezz", "malwers", "defraud", "sprzeniew", "unterschlag", "veruntreu", "detourn"]):
         return EventCategory.embezzlement.value
     if any(
         term in label
-        for term in ["legal", "zarzut", "oskarz", "prokuratur", "lawsuit", "court"]
+        for term in ["legal", "zarzut", "oskarz", "prokuratur", "lawsuit", "court", "anklag", "staatsanwaltschaft", "proces", "fiscal", "demanda"]
     ):
         return EventCategory.legal.value
     if any(
-        term in label for term in ["regulator", "uokik", "knf", "compliance", "policy"]
+        term in label for term in ["regulator", "uokik", "knf", "compliance", "policy", "bafin", "aufsicht", "conformit", "cnmv", "incumpl"]
     ):
         return EventCategory.regulatory.value
     if any(
-        term in label for term in ["govern", "board", "zarzad", "ceo", "management"]
+        term in label for term in ["govern", "board", "zarzad", "ceo", "management", "vorstand", "aufsichtsrat", "conseil", "junta"]
     ):
         return EventCategory.governance.value
     return EventCategory.other.value
@@ -1398,19 +1441,30 @@ def _normalize_event_certainty(value: Any) -> str:
         return EVENT_CERTAINTY_ALIASES[label]
     if any(
         term in label
-        for term in ["confirmed", "convicted", "proven", "potwierdz", "udowodn"]
+            for term in ["confirmed", "convicted", "proven", "potwierdz", "udowodn", "verurteilt", "condamn", "condenad"]
     ):
         return EventCertainty.confirmed.value
     if any(
         term in label
-        for term in ["investigat", "inquiry", "sledzt", "postepow", "probe"]
+            for term in ["investigat", "inquiry", "sledzt", "postepow", "probe", "ermittlung", "untersuchung", "enquete", "investigacion"]
     ):
         return EventCertainty.investigated.value
-    if any(term in label for term in ["deni", "zaprzecz", "refut", "dismiss"]):
+    if any(term in label for term in ["deni", "zaprzecz", "refut", "dismiss", "bestreit", "dement", "rechaz"]):
         return EventCertainty.denied.value
-    if any(term in label for term in ["rumor", "niepotwier", "rzekom", "speculat"]):
+    if any(term in label for term in ["rumor", "niepotwier", "rzekom", "speculat", "angeblich", "pretendu", "presunt", "supuest"]):
         return EventCertainty.rumor.value
     return EventCertainty.alleged.value
+
+
+def _normalize_language(value: Any) -> str:
+    label = _normalize_label(value)
+    if not label:
+        return "unknown"
+    if label in LANGUAGE_ALIASES:
+        return LANGUAGE_ALIASES[label]
+    if len(label) == 2 and label.isalpha():
+        return label
+    return "unknown"
 
 
 def _normalize_label(value: Any) -> str:
@@ -1475,6 +1529,60 @@ def _to_float(value: Any, default: float) -> float:
     return default
 
 
+LANGUAGE_ALIASES = {
+    "pl": "pl",
+    "polish": "pl",
+    "polski": "pl",
+    "en": "en",
+    "english": "en",
+    "angielski": "en",
+    "de": "de",
+    "german": "de",
+    "deutsch": "de",
+    "niemiecki": "de",
+    "fr": "fr",
+    "french": "fr",
+    "francais": "fr",
+    "francuski": "fr",
+    "es": "es",
+    "spanish": "es",
+    "espanol": "es",
+    "hiszpanski": "es",
+    "uk": "uk",
+    "ukrainian": "uk",
+    "ukrainski": "uk",
+    "ru": "ru",
+    "russian": "ru",
+    "rosyjski": "ru",
+}
+
+
+LANGUAGE_MARKERS: dict[str, list[str]] = {
+    "pl": [
+        r"\b(oraz|przez|ktory|ktora|spolka|zarzad|prokuratura|postepowanie)\b",
+        r"\b(nie\s+potwierdzono|wedlug|wobec|zostal\w*)\b",
+    ],
+    "en": [
+        r"\b(the|and|that|company|board|investigation|regulator|according)\b",
+        r"\b(alleged|confirmed|statement|authority|prosecutor)\b",
+    ],
+    "de": [
+        r"\b(und|der|die|das|unternehmen|vorstand|ermittlung|staatsanwaltschaft)\b",
+        r"\b(wegen|nach|gegen|behorde|aufsicht)\b",
+    ],
+    "fr": [
+        r"\b(et|la|le|les|societe|conseil|enquete|procureur|autorite)\b",
+        r"\b(selon|contre|affaire|mise\s+en\s+examen)\b",
+    ],
+    "es": [
+        r"\b(y|el|la|los|empresa|junta|investigacion|fiscalia|autoridad)\b",
+        r"\b(segun|contra|acusad\w*|procedimiento)\b",
+    ],
+    "uk": [r"\b(компанія|розслідування|прокуратура|санкції|суд)\b"],
+    "ru": [r"\b(компания|расследование|прокуратура|санкции|суд)\b"],
+}
+
+
 RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
     "corruption": {
         "weight": 1.35,
@@ -1484,6 +1592,14 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "corruption", "pattern": r"\bcorrupt\w*\b"},
             {"keyword": "bribe", "pattern": r"\bbrib\w*\b"},
             {"keyword": "kickback", "pattern": r"\bkickback\w*\b"},
+            {"keyword": "bestechung", "pattern": r"\bbestech\w*\b"},
+            {"keyword": "korruption", "pattern": r"\bkorrupt\w*\b"},
+            {"keyword": "pot-de-vin", "pattern": r"\bpot\s+de\s+vin\w*\b"},
+            {"keyword": "corruption", "pattern": r"\bcorruption\w*\b"},
+            {"keyword": "corrupcion", "pattern": r"\bcorrupci\w*\b"},
+            {"keyword": "soborno", "pattern": r"\bsoborn\w*\b"},
+            {"keyword": "коррупция", "pattern": r"\bкоррупц\w*\b"},
+            {"keyword": "корупція", "pattern": r"\bкорупц\w*\b"},
         ],
     },
     "sanctions": {
@@ -1493,6 +1609,11 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "sanction", "pattern": r"\bsanction\w*\b"},
             {"keyword": "ofac", "pattern": r"\bofac\b"},
             {"keyword": "embargo", "pattern": r"\bembargo\w*\b"},
+            {"keyword": "sanktionen", "pattern": r"\bsanktion\w*\b"},
+            {"keyword": "sanctions", "pattern": r"\bsanction\w*\b"},
+            {"keyword": "sanciones", "pattern": r"\bsancion\w*\b"},
+            {"keyword": "санкции", "pattern": r"\bсанкц\w*\b"},
+            {"keyword": "санкції", "pattern": r"\bсанкц\w*\b"},
         ],
     },
     "money_laundering": {
@@ -1502,6 +1623,12 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "money laundering", "pattern": r"\bmoney\s+launder\w*\b"},
             {"keyword": "aml", "pattern": r"\baml\b"},
             {"keyword": "terrorist financing", "pattern": r"\bfinanc\w*\s+terror\w*\b"},
+            {"keyword": "geldwasche", "pattern": r"\bgeldwasch\w*\b"},
+            {"keyword": "blanchiment d'argent", "pattern": r"\bblanchiment\w*\s+d\s+argent\w*\b"},
+            {"keyword": "blanqueo de capitales", "pattern": r"\bblanqueo\w*\s+de\s+capital\w*\b"},
+            {"keyword": "lavado de dinero", "pattern": r"\blavado\w*\s+de\s+dinero\w*\b"},
+            {"keyword": "отмывание денег", "pattern": r"\bотмыв\w*\s+денег\w*\b"},
+            {"keyword": "відмивання коштів", "pattern": r"\bвідмив\w*\s+кошт\w*\b"},
         ],
     },
     "fraud": {
@@ -1512,6 +1639,12 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "wyludzenie", "pattern": r"\bwyludz\w*\b"},
             {"keyword": "scam", "pattern": r"\bscam\w*\b"},
             {"keyword": "ponzi", "pattern": r"\bponzi\w*\b"},
+            {"keyword": "betrug", "pattern": r"\bbetrug\w*\b"},
+            {"keyword": "escroquerie", "pattern": r"\bescroquer\w*\b"},
+            {"keyword": "fraude", "pattern": r"\bfraude\w*\b"},
+            {"keyword": "estafa", "pattern": r"\bestaf\w*\b"},
+            {"keyword": "мошенничество", "pattern": r"\bмошеннич\w*\b"},
+            {"keyword": "шахрайство", "pattern": r"\bшахрай\w*\b"},
         ],
     },
     "embezzlement": {
@@ -1521,6 +1654,11 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "malwersacja", "pattern": r"\bmalwers\w*\b"},
             {"keyword": "embezzlement", "pattern": r"\bembezz\w*\b"},
             {"keyword": "sprzeniewierzenie", "pattern": r"\bsprzeniew\w*\b"},
+            {"keyword": "unterschlagung", "pattern": r"\bunterschlag\w*\b"},
+            {"keyword": "veruntreuung", "pattern": r"\bveruntreu\w*\b"},
+            {"keyword": "detournement", "pattern": r"\bdetourn\w*\b"},
+            {"keyword": "malversacion", "pattern": r"\bmalvers\w*\b"},
+            {"keyword": "растрата", "pattern": r"\bрастрат\w*\b"},
         ],
     },
     "legal": {
@@ -1532,6 +1670,14 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             {"keyword": "areszt", "pattern": r"\bareszt\w*\b"},
             {"keyword": "investigation", "pattern": r"\binvestigat\w*\b"},
             {"keyword": "lawsuit", "pattern": r"\blawsuit\w*\b"},
+            {"keyword": "anklage", "pattern": r"\banklag\w*\b"},
+            {"keyword": "staatsanwaltschaft", "pattern": r"\bstaatsanwaltschaft\w*\b"},
+            {"keyword": "verfahren", "pattern": r"\bverfahren\w*\b"},
+            {"keyword": "mise en examen", "pattern": r"\bmise\s+en\s+examen\w*\b"},
+            {"keyword": "proces", "pattern": r"\bproces\w*\b"},
+            {"keyword": "fiscalia", "pattern": r"\bfiscal\w*\b"},
+            {"keyword": "demanda", "pattern": r"\bdemand\w*\b"},
+            {"keyword": "прокуратура", "pattern": r"\bпрокуратур\w*\b"},
         ],
     },
     "regulatory": {
@@ -1545,6 +1691,13 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
             },
             {"keyword": "regulator", "pattern": r"\bregulator\w*\b"},
             {"keyword": "compliance breach", "pattern": r"\bcompliance\s+breach\w*\b"},
+            {"keyword": "bafin", "pattern": r"\bbafin\b"},
+            {"keyword": "aufsicht", "pattern": r"\baufsicht\w*\b"},
+            {"keyword": "amf", "pattern": r"\bamf\b"},
+            {"keyword": "conformite", "pattern": r"\bconformit\w*\b"},
+            {"keyword": "cnmv", "pattern": r"\bcnmv\b"},
+            {"keyword": "incumplimiento", "pattern": r"\bincumpl\w*\b"},
+            {"keyword": "регулятор", "pattern": r"\bрегулятор\w*\b"},
         ],
     },
     "governance": {
@@ -1557,6 +1710,11 @@ RISK_TERM_CONFIG: dict[str, dict[str, Any]] = {
                 "keyword": "conflict of interest",
                 "pattern": r"\bconflict\s+of\s+interest\w*\b",
             },
+            {"keyword": "vorstand", "pattern": r"\bvorstand\w*\b"},
+            {"keyword": "aufsichtsrat", "pattern": r"\baufsichtsrat\w*\b"},
+            {"keyword": "conseil d'administration", "pattern": r"\bconseil\s+d\s+administration\w*\b"},
+            {"keyword": "junta directiva", "pattern": r"\bjunta\s+directiv\w*\b"},
+            {"keyword": "конфликт интересов", "pattern": r"\bконфликт\w*\s+интерес\w*\b"},
         ],
     },
 }
@@ -1568,6 +1726,15 @@ POSITIVE_PATTERNS = [
     r"\bpozytywn\w*\s+ocen\w*\b",
     r"\bcompliance\s+award\w*\b",
     r"\bwzorow\w*\s+zgodn\w*\b",
+    r"\bacquitt\w*\b",
+    r"\bcharges?\s+dismiss\w*\b",
+    r"\bno\s+wrongdoing\w*\b",
+    r"\bfreigesprochen\w*\b",
+    r"\bkeine\s+verstoss\w*\b",
+    r"\brelax\w*\b",
+    r"\baucune\s+infraction\w*\b",
+    r"\babsolv\w*\b",
+    r"\bsin\s+irregularidad\w*\b",
 ]
 
 UNCERTAINTY_PATTERNS = [
@@ -1577,6 +1744,15 @@ UNCERTAINTY_PATTERNS = [
     r"\brumou?r\w*\b",
     r"\bniepotwierdz\w*\b",
     r"\bnie\s+potwierdz\w*\b",
+    r"\breportedly\w*\b",
+    r"\bunverified\w*\b",
+    r"\bmutmass\w*\b",
+    r"\bangeblich\w*\b",
+    r"\bpresume\w*\b",
+    r"\bpretendu\w*\b",
+    r"\bsupuest\w*\b",
+    r"\bpresunt\w*\b",
+    r"\bнеподтвержден\w*\b",
 ]
 
 DENIAL_PATTERNS = [
@@ -1584,6 +1760,11 @@ DENIAL_PATTERNS = [
     r"\bdeni\w*\b",
     r"\boddalil\w*\s+zarzut\w*\b",
     r"\brefut\w*\b",
+    r"\breject\w*\s+allegation\w*\b",
+    r"\bbestreit\w*\b",
+    r"\bdementi\w*\b",
+    r"\brechaz\w*\b",
+    r"\bотрица\w*\b",
 ]
 
 INVESTIGATED_PATTERNS = [
@@ -1592,6 +1773,12 @@ INVESTIGATED_PATTERNS = [
     r"\binvestigat\w*\b",
     r"\bprobe\w*\b",
     r"\binquiry\w*\b",
+    r"\bermittlung\w*\b",
+    r"\buntersuchung\w*\b",
+    r"\benquete\w*\b",
+    r"\binvestigacion\w*\b",
+    r"\bрасследован\w*\b",
+    r"\bрозслідуван\w*\b",
 ]
 
 CONFIRMED_PATTERNS = [
@@ -1600,6 +1787,14 @@ CONFIRMED_PATTERNS = [
     r"\bconvict\w*\b",
     r"\bguilty\s+verdict\w*\b",
     r"\bconfirmed\w*\b",
+    r"\bverurteilt\w*\b",
+    r"\brechtskraftig\w*\b",
+    r"\bcondamn\w*\b",
+    r"\bdeclare\s+coupable\w*\b",
+    r"\bcondenad\w*\b",
+    r"\bveredicto\s+culpable\w*\b",
+    r"\bприговор\w*\b",
+    r"\bвиновн\w*\b",
 ]
 
 SENTIMENT_ALIASES = {
@@ -1624,14 +1819,24 @@ COMPANY_ROLE_ALIASES = {
     "oskarzona": CompanyRole.accused.value,
     "suspect": CompanyRole.accused.value,
     "defendant": CompanyRole.accused.value,
+    "angeklagter": CompanyRole.accused.value,
+    "beschuldigter": CompanyRole.accused.value,
+    "mis en examen": CompanyRole.accused.value,
+    "acusado": CompanyRole.accused.value,
     "victim": CompanyRole.victim.value,
     "ofiara": CompanyRole.victim.value,
     "pokrzywdzony": CompanyRole.victim.value,
     "poszkodowany": CompanyRole.victim.value,
+    "opfer": CompanyRole.victim.value,
+    "victime": CompanyRole.victim.value,
+    "victima": CompanyRole.victim.value,
     "regulator": CompanyRole.regulator.value,
     "authority": CompanyRole.regulator.value,
     "witness": CompanyRole.witness.value,
     "swiadek": CompanyRole.witness.value,
+    "zeuge": CompanyRole.witness.value,
+    "temoin": CompanyRole.witness.value,
+    "testigo": CompanyRole.witness.value,
     "mentioned": CompanyRole.mentioned.value,
     "mention": CompanyRole.mentioned.value,
     "wspomniany": CompanyRole.mentioned.value,
@@ -1643,15 +1848,27 @@ EVENT_CATEGORY_ALIASES = {
     "corruption": EventCategory.corruption.value,
     "korupcja": EventCategory.corruption.value,
     "bribery": EventCategory.corruption.value,
+    "bestechung": EventCategory.corruption.value,
+    "soborno": EventCategory.corruption.value,
     "sankcje": EventCategory.sanctions.value,
     "sanctions": EventCategory.sanctions.value,
+    "sanktionen": EventCategory.sanctions.value,
+    "sanciones": EventCategory.sanctions.value,
     "money laundering": EventCategory.money_laundering.value,
     "pranie pieniedzy": EventCategory.money_laundering.value,
+    "geldwasche": EventCategory.money_laundering.value,
+    "blanchiment d argent": EventCategory.money_laundering.value,
+    "blanqueo de capitales": EventCategory.money_laundering.value,
     "aml": EventCategory.money_laundering.value,
     "fraud": EventCategory.fraud.value,
     "oszustwo": EventCategory.fraud.value,
+    "betrug": EventCategory.fraud.value,
+    "escroquerie": EventCategory.fraud.value,
+    "estafa": EventCategory.fraud.value,
     "embezzlement": EventCategory.embezzlement.value,
     "defraudacja": EventCategory.embezzlement.value,
+    "unterschlagung": EventCategory.embezzlement.value,
+    "veruntreuung": EventCategory.embezzlement.value,
     "legal": EventCategory.legal.value,
     "regulatory": EventCategory.regulatory.value,
     "governance": EventCategory.governance.value,
@@ -1660,14 +1877,23 @@ EVENT_CATEGORY_ALIASES = {
 EVENT_CERTAINTY_ALIASES = {
     "confirmed": EventCertainty.confirmed.value,
     "potwierdzone": EventCertainty.confirmed.value,
+    "verurteilt": EventCertainty.confirmed.value,
+    "condamne": EventCertainty.confirmed.value,
+    "condenado": EventCertainty.confirmed.value,
     "investigated": EventCertainty.investigated.value,
     "w trakcie sledztwa": EventCertainty.investigated.value,
+    "ermittlung": EventCertainty.investigated.value,
+    "enquete": EventCertainty.investigated.value,
+    "investigacion": EventCertainty.investigated.value,
     "alleged": EventCertainty.alleged.value,
     "zarzuty": EventCertainty.alleged.value,
     "rumor": EventCertainty.rumor.value,
     "niepotwierdzone": EventCertainty.rumor.value,
     "denied": EventCertainty.denied.value,
     "zaprzeczone": EventCertainty.denied.value,
+    "bestritten": EventCertainty.denied.value,
+    "dementi": EventCertainty.denied.value,
+    "rechazado": EventCertainty.denied.value,
 }
 
 # ============================================================================
@@ -1786,6 +2012,7 @@ __all__ = [
     "RiskEvent",
     "CompanyMention",
     "analyze_article",
+    "detect_article_language",
     "parse_analysis_payload",
     "risk_level_from_score",
 ]

@@ -61,6 +61,9 @@ class CompanyResponse(BaseModel):
     id: int
     name: str
     nip: str | None
+    isin: str | None = None
+    industry: str | None = None
+    aliases: list[str] = Field(default_factory=list)
     current_score: float
     created_at: datetime
     ticker_gpw: str | None = None
@@ -141,8 +144,20 @@ class ArticleResponse(BaseModel):
     content: str | None = None
     source: str | None
     published_at: datetime | None
+    language: str | None = None
     processed: bool
     created_at: datetime
+    risk_score: float | None = None
+    reputation_score: float | None = None
+    category: str | None = None
+    score_recorded_at: datetime | None = None
+
+    @field_validator("risk_score", "reputation_score", mode="before")
+    @classmethod
+    def _round_article_scores(cls, value: float | int | None) -> float | None:
+        if value is None:
+            return None
+        return _round_score(value)
 
 
 class ArticleAnalyzeRequest(BaseModel):
@@ -154,6 +169,7 @@ class ArticleAnalyzeRequest(BaseModel):
 class ArticleAnalyzeResponse(BaseModel):
     ryzyko_score: float
     pewnosc: float
+    jezyk: str = "unknown"
     kategoria: str
     waga_kontekstu: str
     uzasadnienie: str

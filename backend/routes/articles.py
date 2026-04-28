@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from analyzer import ArticleAnalyzer, ArticleInput
+from analyzer import ArticleAnalyzer, ArticleInput, detect_article_language
 from database import get_db
 from models import Article
 from schemas import (
@@ -88,6 +88,7 @@ def analyze_article(payload: ArticleAnalyzeRequest):
     return ArticleAnalyzeResponse(
         ryzyko_score=analysis.risk_score,
         pewnosc=analysis.confidence,
+        jezyk=analysis.language,
         kategoria=category,
         waga_kontekstu=context_weight,
         uzasadnienie=analysis.summary,
@@ -142,7 +143,8 @@ def list_articles(
     if date_to is not None:
         query = query.filter(Article.published_at <= date_to)
 
-    return query.order_by(Article.created_at.desc()).offset(skip).limit(limit).all()
+    articles = query.order_by(Article.created_at.desc()).offset(skip).limit(limit).all()
+    return [_article_response(article) for article in articles]
 
 
 # GET /articles/{article_id}
@@ -153,4 +155,18 @@ def get_article(article_id: int, db: Session = Depends(get_db)):
     article = db.query(Article).get(article_id)
     if article is None:
         raise HTTPException(status_code=404, detail="Article not found")
-    return article
+    return _article_response(article)
+
+
+def _article_response(article: Article) -> ArticleResponse:
+    return ArticleResponse(
+        id=article.id,
+        url=article.url,
+        title=article.title,
+        content=article.content,
+        source=article.source,
+        published_at=article.published_at,
+        language=detect_article_language(f"{article.title or ''}\n{article.content or ''}"),
+        processed=article.processed,
+        created_at=article.created_at,
+    )

@@ -56,6 +56,145 @@ const momentumToneStyles = {
   },
 } as const;
 
+const HISTORY_WINDOWS = [30, 90, 180, 365] as const;
+
+const articleRiskStyles = {
+  high: 'border-[var(--risk-high-rule)] bg-[var(--risk-high-bg)] text-[var(--risk-high)]',
+  medium: 'border-[var(--risk-medium-rule)] bg-[var(--risk-medium-bg)] text-[var(--risk-medium)]',
+  low: 'border-[var(--risk-low-rule)] bg-[var(--risk-low-bg)] text-[var(--risk-low)]',
+  unknown: 'border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-muted)]',
+} as const;
+
+type DecisionLevel = 'proceed' | 'review' | 'block';
+
+const decisionStyles: Record<DecisionLevel, { border: string; background: string; color: string }> = {
+  proceed: {
+    border: 'var(--risk-low-rule)',
+    background: 'var(--risk-low-bg)',
+    color: 'var(--risk-low)',
+  },
+  review: {
+    border: 'var(--risk-medium-rule)',
+    background: 'var(--risk-medium-bg)',
+    color: 'var(--risk-medium)',
+  },
+  block: {
+    border: 'var(--risk-high-rule)',
+    background: 'var(--risk-high-bg)',
+    color: 'var(--risk-high)',
+  },
+};
+
+function dueDiligenceDecision(
+  company: Company,
+  articles: Article[],
+  locale: string,
+): { level: DecisionLevel; label: string; title: string; reasons: string[] } {
+  const highSignalCount = articles.filter((article) => (article.risk_score ?? 0) >= 55).length;
+  const mediumSignalCount = articles.filter((article) => (article.risk_score ?? 0) >= 25).length;
+  const delta7d = company.momentum_7d?.delta ?? 0;
+  const sanctionsStatus = company.sanctions?.status;
+
+  if (company.sanctions?.is_sanctioned || sanctionsStatus === 'listed') {
+    return {
+      level: 'block',
+      label: 'BLOCK',
+      title: locale === 'pl' ? 'Blokada relacji' : 'Block relationship',
+      reasons: [
+        locale === 'pl' ? 'Podmiot występuje na liście sankcyjnej.' : 'The entity appears on a sanctions list.',
+        locale === 'pl' ? 'Wymagana eskalacja do compliance przed jakimkolwiek działaniem.' : 'Compliance escalation is required before any action.',
+      ],
+    };
+  }
+
+  if (company.current_score < 45 || delta7d <= -20 || highSignalCount >= 2) {
+    return {
+      level: 'block',
+      label: 'BLOCK',
+      title: locale === 'pl' ? 'Nie rekomendować współpracy' : 'Do not proceed',
+      reasons: [
+        company.current_score < 45
+          ? locale === 'pl' ? 'Scoring reputacyjny znajduje się w strefie wysokiego ryzyka.' : 'Reputation score is in the high-risk band.'
+          : locale === 'pl' ? 'Wykryto gwałtowne pogorszenie reputacji.' : 'Rapid reputation deterioration was detected.',
+        highSignalCount > 0
+          ? locale === 'pl' ? `Liczba wysokich sygnałów w oknie analizy: ${highSignalCount}.` : `High-risk signals in the selected window: ${highSignalCount}.`
+          : locale === 'pl' ? 'Wymagana ręczna weryfikacja materiału dowodowego.' : 'Manual evidence review is required.',
+      ],
+    };
+  }
+
+  if (company.current_score < 75 || delta7d <= -5 || sanctionsStatus === 'unavailable' || mediumSignalCount >= 3) {
+    return {
+      level: 'review',
+      label: 'REVIEW',
+      title: locale === 'pl' ? 'Wymagana analiza manualna' : 'Manual review required',
+      reasons: [
+        company.current_score < 75
+          ? locale === 'pl' ? 'Scoring wskazuje podwyższoną ekspozycję reputacyjną.' : 'Score indicates elevated reputation exposure.'
+          : locale === 'pl' ? 'Wykryto sygnały wymagające potwierdzenia.' : 'Detected signals require confirmation.',
+        sanctionsStatus === 'unavailable'
+          ? locale === 'pl' ? 'Nie potwierdzono statusu sankcyjnego.' : 'Sanctions status has not been confirmed.'
+          : locale === 'pl' ? `Sygnały ryzyka w oknie analizy: ${mediumSignalCount}.` : `Risk signals in the selected window: ${mediumSignalCount}.`,
+      ],
+    };
+  }
+
+  return {
+    level: 'proceed',
+    label: 'PROCEED',
+    title: locale === 'pl' ? 'Można kontynuować' : 'Proceed',
+    reasons: [
+      locale === 'pl' ? 'Brak wpisu sankcyjnego i niski profil ryzyka.' : 'No sanctions hit and low risk profile.',
+      locale === 'pl' ? 'Nie wykryto istotnego pogorszenia reputacji w oknie analizy.' : 'No material reputation deterioration detected in the analysis window.',
+    ],
+  };
+}
+
+function articleRiskView(score: number | null | undefined, locale: string) {
+  if (score == null) {
+    return {
+      label: locale === 'pl' ? 'Brak oceny' : 'No score',
+      className: articleRiskStyles.unknown,
+    };
+  }
+  if (score >= 55) {
+    return {
+      label: locale === 'pl' ? 'Wysoki sygnał' : 'High signal',
+      className: articleRiskStyles.high,
+    };
+  }
+  if (score >= 25) {
+    return {
+      label: locale === 'pl' ? 'Średni sygnał' : 'Medium signal',
+      className: articleRiskStyles.medium,
+    };
+  }
+  return {
+    label: locale === 'pl' ? 'Niski sygnał' : 'Low signal',
+    className: articleRiskStyles.low,
+  };
+}
+
+function historyWindowLabel(days: number, locale: string): string {
+  if (days >= 365) return locale === 'pl' ? '12 mies.' : '12 mo';
+  return `${days}d`;
+}
+
+function languageLabel(code: string | null | undefined, locale: string): string {
+  const labels: Record<string, { pl: string; en: string }> = {
+    pl: { pl: 'Polski', en: 'Polish' },
+    en: { pl: 'Angielski', en: 'English' },
+    de: { pl: 'Niemiecki', en: 'German' },
+    fr: { pl: 'Francuski', en: 'French' },
+    es: { pl: 'Hiszpański', en: 'Spanish' },
+    uk: { pl: 'Ukraiński', en: 'Ukrainian' },
+    ru: { pl: 'Rosyjski', en: 'Russian' },
+    unknown: { pl: 'Nieznany', en: 'Unknown' },
+  };
+  const key = (code || 'unknown').toLowerCase();
+  return labels[key]?.[locale === 'pl' ? 'pl' : 'en'] ?? key.toUpperCase();
+}
+
 function momentumLabel(label: string | undefined, locale: string): string {
   const pl = {
     rapid_deterioration: 'Gwałtowne pogorszenie',
@@ -97,6 +236,7 @@ export default function CompanyDetailPage() {
   const [company, setCompany] = useState<Company | null>(null);
   const [scoreData, setScoreData] = useState<CompanyScoreResponse | null>(null);
   const [articles, setArticles] = useState<Article[]>([]);
+  const [historyDays, setHistoryDays] = useState<number>(180);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -107,8 +247,8 @@ export default function CompanyDetailPage() {
         setError(null);
         const [companyData, scoreResp, articlesData] = await Promise.all([
           getCompanyDetail(Number(id)),
-          getCompanyScore(Number(id)),
-          getCompanyArticles(Number(id), { days: 180, limit: 20 }),
+          getCompanyScore(Number(id), { days: historyDays }),
+          getCompanyArticles(Number(id), { days: historyDays, limit: 20 }),
         ]);
         setCompany(companyData);
         setScoreData(scoreResp);
@@ -121,7 +261,7 @@ export default function CompanyDetailPage() {
       }
     };
     fetchData();
-  }, [id, t.detail.errorBody]);
+  }, [id, historyDays, t.detail.errorBody]);
 
   const backButton = (
     <button
@@ -213,6 +353,9 @@ export default function CompanyDetailPage() {
   const backendDrop = momentum7d && momentum7d.delta <= -20 ? Math.abs(momentum7d.delta) : undefined;
   const showAlert = backendDrop != null || fallbackAlert.show;
   const scoreDelta = backendDrop ?? fallbackAlert.delta;
+  const aliases = company.aliases ?? [];
+  const decision = dueDiligenceDecision(company, articles, locale);
+  const decisionStyle = decisionStyles[decision.level];
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -285,6 +428,113 @@ export default function CompanyDetailPage() {
           </section>
 
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+            <section className="border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="eyebrow mb-1">
+                  {locale === 'pl' ? 'Zakres analizy' : 'Analysis window'}
+                </p>
+                <p className="text-sm text-[var(--ink-2)]">
+                  {locale === 'pl'
+                    ? 'Historia scoringu i publikacje są liczone dla wybranego okna czasu.'
+                    : 'Score history and evidence coverage are calculated for the selected time window.'}
+                </p>
+              </div>
+              <div className="grid grid-cols-4 border border-[var(--border-strong)]">
+                {HISTORY_WINDOWS.map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setHistoryDays(days)}
+                    aria-pressed={historyDays === days}
+                    className={`px-3 py-2 text-[11px] uppercase tracking-[0.08em] font-extrabold border-r last:border-r-0 border-[var(--border-strong)] transition-colors ${
+                      historyDays === days
+                        ? 'bg-[var(--gov-blue)] text-white'
+                        : 'bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-alt)]'
+                    }`}
+                  >
+                    {historyWindowLabel(days, locale)}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section
+              className="border p-5 sm:p-6"
+              style={{ borderColor: decisionStyle.border, background: decisionStyle.background }}
+            >
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5">
+                <div>
+                  <p className="eyebrow mb-2" style={{ color: decisionStyle.color }}>
+                    {locale === 'pl' ? 'Decyzja due diligence' : 'Due diligence decision'}
+                  </p>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span
+                      className="px-3 py-2 border text-[18px] font-extrabold uppercase tracking-[0.12em]"
+                      style={{ borderColor: decisionStyle.border, color: decisionStyle.color, background: 'var(--surface)' }}
+                    >
+                      {decision.label}
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-[var(--ink)]">{decision.title}</h2>
+                  </div>
+                  <p className="text-sm text-[var(--ink-2)] mt-3 max-w-3xl leading-relaxed">
+                    {locale === 'pl'
+                      ? 'Rekomendacja jest wyliczana deterministycznie z wyniku reputacji, trendu, sankcji oraz liczby sygnałów ryzyka w wybranym oknie.'
+                      : 'The recommendation is deterministically derived from reputation score, trend, sanctions, and risk signals in the selected window.'}
+                  </p>
+                </div>
+                <div className="lg:w-[420px] bg-[var(--surface)] border border-[var(--border)] p-4">
+                  <p className="eyebrow mb-3">{locale === 'pl' ? 'Powody decyzji' : 'Decision reasons'}</p>
+                  <ul className="space-y-2 text-sm text-[var(--ink-2)]">
+                    {decision.reasons.map((reason) => (
+                      <li key={reason} className="flex gap-2">
+                        <span style={{ color: decisionStyle.color }} aria-hidden="true">■</span>
+                        <span>{reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section className="gov-panel">
+              <div className="gov-section-header">
+                <span>{locale === 'pl' ? 'Rejestr nazw i identyfikatorów' : 'Names and identifiers registry'}</span>
+                <span>{locale === 'pl' ? 'Deduplikacja podmiotu' : 'Entity resolution'}</span>
+              </div>
+              <div className="p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div>
+                  <p className="eyebrow mb-3">{locale === 'pl' ? 'Warianty nazw' : 'Name variants'}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="px-2.5 py-1.5 border border-[var(--gov-blue)] bg-[var(--surface-alt)] text-[12px] font-extrabold text-[var(--ink)]">
+                      {company.name}
+                    </span>
+                    {aliases.length > 0 ? aliases.map((alias) => (
+                      <span key={alias} className="px-2.5 py-1.5 border border-[var(--border)] bg-[var(--surface)] text-[12px] text-[var(--ink-2)]">
+                        {alias}
+                      </span>
+                    )) : (
+                      <span className="text-sm text-[var(--ink-muted)]">
+                        {locale === 'pl' ? 'Brak dodatkowych aliasów w rejestrze.' : 'No additional aliases registered.'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 border border-[var(--border)]">
+                  {[
+                    { label: t.card.nip, value: company.nip ?? '—' },
+                    { label: 'ISIN', value: company.isin ?? '—' },
+                    { label: 'GPW', value: company.ticker_gpw ?? '—' },
+                    { label: locale === 'pl' ? 'Branża' : 'Industry', value: company.industry ?? '—' },
+                  ].map((item) => (
+                    <div key={item.label} className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{item.label}</div>
+                      <div className="gov-meta-value font-mono tnum">{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
             {showAlert && <AlertBanner show={true} scoreDelta={scoreDelta} />}
 
             {company.sanctions?.status === 'unavailable' && (
@@ -552,46 +802,71 @@ export default function CompanyDetailPage() {
                 </p>
               ) : (
                 <ol className="border border-[var(--border)] bg-[var(--surface)] divide-y divide-[var(--rule)]">
-                  {articles.slice(0, 5).map((article, i) => (
-                    <li key={article.id} className="px-5 py-4 flex items-start gap-4 hover:bg-[var(--surface-alt)] transition-colors">
-                      <span className="eyebrow mt-1 tnum w-6 shrink-0">
-                        {String(i + 1).padStart(2, '0')}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/articles/${article.id}`}
-                          className="font-medium text-[var(--ink)] hover:text-[var(--link)] leading-snug block"
-                          style={{ textDecorationColor: 'var(--rule)' }}
-                        >
-                          {article.title || (locale === 'pl' ? 'Artykul bez tytulu' : 'Untitled article')}
-                        </Link>
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-[var(--ink-muted)]">
-                          {article.source && (
+                  {articles.slice(0, 8).map((article, i) => {
+                    const riskView = articleRiskView(article.risk_score, locale);
+                    const category = article.category
+                      ? t.categories[normalizeCategory(article.category)]
+                      : locale === 'pl' ? 'Brak kategorii' : 'No category';
+                    return (
+                      <li key={article.id} className="px-5 py-4 flex items-start gap-4 hover:bg-[var(--surface-alt)] transition-colors">
+                        <span className="eyebrow mt-1 tnum w-6 shrink-0">
+                          {String(i + 1).padStart(2, '0')}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <Link
+                            href={`/articles/${article.id}`}
+                            className="font-medium text-[var(--ink)] hover:text-[var(--link)] leading-snug block"
+                            style={{ textDecorationColor: 'var(--rule)' }}
+                          >
+                            {article.title || (locale === 'pl' ? 'Artykuł bez tytułu' : 'Untitled article')}
+                          </Link>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-[var(--ink-muted)]">
+                            {article.source && (
+                              <span>
+                                <span className="font-semibold">{t.detail.articleSource}:</span>{' '}
+                                <span className="font-mono">{article.source}</span>
+                              </span>
+                            )}
+                            {article.published_at && (
+                              <span className="tnum">
+                                {formatDate(article.published_at, {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                })}
+                              </span>
+                            )}
                             <span>
-                              <span className="font-semibold">{t.detail.articleSource}:</span>{' '}
-                              <span className="font-mono">{article.source}</span>
+                              <span className="font-semibold">{locale === 'pl' ? 'Język' : 'Language'}:</span>{' '}
+                              <span className="font-mono uppercase">{article.language || 'unknown'}</span>
+                              <span className="ml-1">({languageLabel(article.language, locale)})</span>
                             </span>
-                          )}
-                          {article.published_at && (
-                            <span className="tnum">
-                              {formatDate(article.published_at, {
-                                day: '2-digit',
-                                month: 'short',
-                                year: 'numeric',
-                              })}
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                            <span className={`px-2 py-1 border uppercase tracking-[0.08em] font-extrabold ${riskView.className}`}>
+                              {riskView.label}
                             </span>
-                          )}
+                            <span className="px-2 py-1 border border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-2)]">
+                              {locale === 'pl' ? 'Ryzyko' : 'Risk'}: <span className="font-mono tnum">{article.risk_score != null ? formatScore(article.risk_score) : '—'}</span>
+                            </span>
+                            <span className="px-2 py-1 border border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-2)] truncate">
+                              {locale === 'pl' ? 'Kategoria' : 'Category'}: {category}
+                            </span>
+                            <span className="px-2 py-1 border border-[var(--border)] bg-[var(--surface-alt)] text-[var(--ink-2)]">
+                              {locale === 'pl' ? 'Score po' : 'Score after'}: <span className="font-mono tnum">{article.reputation_score != null ? formatScore(article.reputation_score) : '—'}</span>
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0 mt-1"
-                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </li>
-                  ))}
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="w-3.5 h-3.5 text-[var(--ink-muted)] shrink-0 mt-1"
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </li>
+                    );
+                  })}
                 </ol>
               )}
             </section>

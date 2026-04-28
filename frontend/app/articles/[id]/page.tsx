@@ -16,6 +16,21 @@ function splitParagraphs(content: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+function languageLabel(code: string | null | undefined, locale: string): string {
+  const labels: Record<string, { pl: string; en: string }> = {
+    pl: { pl: 'Polski', en: 'Polish' },
+    en: { pl: 'Angielski', en: 'English' },
+    de: { pl: 'Niemiecki', en: 'German' },
+    fr: { pl: 'Francuski', en: 'French' },
+    es: { pl: 'Hiszpański', en: 'Spanish' },
+    uk: { pl: 'Ukraiński', en: 'Ukrainian' },
+    ru: { pl: 'Rosyjski', en: 'Russian' },
+    unknown: { pl: 'Nieznany', en: 'Unknown' },
+  };
+  const key = (code || 'unknown').toLowerCase();
+  return labels[key]?.[locale === 'pl' ? 'pl' : 'en'] ?? key.toUpperCase();
+}
+
 export default function ArticlePage() {
   const params = useParams();
   const router = useRouter();
@@ -112,7 +127,7 @@ export default function ArticlePage() {
                   <h1 className="text-3xl sm:text-[38px] font-extrabold tracking-tight text-[var(--ink)] leading-[1.08]">
                     {article.title || (locale === 'pl' ? 'Artykul bez tytulu' : 'Untitled article')}
                   </h1>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 border border-[var(--border)] mt-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 border border-[var(--border)] mt-6">
                     <div className="gov-meta-row sm:block">
                       <div className="gov-meta-label">{t.detail.articleSource}</div>
                       <div className="gov-meta-value font-mono">{article.source ?? '—'}</div>
@@ -123,6 +138,13 @@ export default function ArticlePage() {
                         {article.published_at
                           ? formatDate(article.published_at, { day: '2-digit', month: 'short', year: 'numeric' })
                           : '—'}
+                      </div>
+                    </div>
+                    <div className="gov-meta-row sm:block">
+                      <div className="gov-meta-label">{locale === 'pl' ? 'Język' : 'Language'}</div>
+                      <div className="gov-meta-value">
+                        <span className="font-mono uppercase">{article.language || 'unknown'}</span>
+                        <span className="ml-2 text-[var(--ink-muted)]">{languageLabel(article.language, locale)}</span>
                       </div>
                     </div>
                     <div className="gov-meta-row sm:block">

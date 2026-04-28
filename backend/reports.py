@@ -56,6 +56,7 @@ def generate_risk_report(
     momentum_30d: dict[str, Any] | None,
     top_categories: list[dict[str, Any]] | None,
     sanctions: dict[str, Any] | None,
+    decision: dict[str, Any] | None,
     articles_count: int,
     generated_at: datetime | None = None,
 ) -> bytes | None:
@@ -80,6 +81,7 @@ def generate_risk_report(
             momentum_30d=momentum_30d,
             top_categories=top_categories,
             sanctions=sanctions,
+            decision=decision,
             articles_count=articles_count,
             generated_at=generated_at or datetime.now(),
         )
@@ -98,6 +100,7 @@ def _build_pdf(
     momentum_30d: dict[str, Any] | None,
     top_categories: list[dict[str, Any]] | None,
     sanctions: dict[str, Any] | None,
+    decision: dict[str, Any] | None,
     articles_count: int,
     generated_at: datetime,
 ) -> bytes:
@@ -184,6 +187,26 @@ def _build_pdf(
     )
     story.append(summary_table)
     story.append(Spacer(1, 0.25 * inch))
+
+    if decision:
+        story.append(Paragraph("Due Diligence Recommendation", heading_style))
+        decision_level = str(decision.get("level") or "review").upper()
+        decision_title = str(decision.get("title") or "Manual review required")
+        reasons = decision.get("reasons") or []
+        story.append(
+            Paragraph(
+                f"<b>{decision_level}</b> — {decision_title}",
+                ParagraphStyle(
+                    "Decision",
+                    parent=normal_style,
+                    textColor=_decision_to_color(decision_level),
+                    fontSize=12,
+                ),
+            )
+        )
+        for reason in reasons[:4]:
+            story.append(Paragraph(f"• {reason}", normal_style))
+        story.append(Spacer(1, 0.25 * inch))
 
     # Momentum
     if momentum_7d or momentum_30d:
@@ -297,6 +320,15 @@ def _risk_to_color(risk_level: str) -> colors.Color:
     if "critical" in risk_lower or "high" in risk_lower:
         return RISK_HIGH_COLOR
     if "medium" in risk_lower:
+        return RISK_MEDIUM_COLOR
+    return RISK_LOW_COLOR
+
+
+def _decision_to_color(decision_level: str) -> colors.Color:
+    normalized = decision_level.lower()
+    if normalized == "block":
+        return RISK_HIGH_COLOR
+    if normalized == "review":
         return RISK_MEDIUM_COLOR
     return RISK_LOW_COLOR
 

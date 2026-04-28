@@ -35,6 +35,20 @@ The system includes **12 realistic demo companies** with:
 
 ## Key Scenarios to Try
 
+### Scenario 0: Multilingual Risk Detection
+
+**What to See**:
+1. Open a company detail page.
+2. Review the related publications list.
+3. Each article shows a detected language code such as `PL`, `EN`, or `DE`.
+4. Risk terms from different languages are mapped to the same canonical categories.
+
+**Why This Matters**:
+- The challenge calls out multilingual support, inflection, synonyms, and industry context.
+- FANUM normalizes multilingual AML terms into categories such as corruption, sanctions, money laundering, fraud, legal, regulatory, and governance.
+
+---
+
 ### Scenario 1: Reputation Shock & Recovery
 
 **Company**: "Meridian Trade Finance" (ID: 1)

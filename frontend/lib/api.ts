@@ -31,6 +31,9 @@ export interface Company {
   id: number;
   name: string;
   nip?: string | null;
+  isin?: string | null;
+  industry?: string | null;
+  aliases?: string[];
   current_score: number;
   created_at: string;
   momentum_7d?: RiskMomentum | null;
@@ -92,8 +95,13 @@ export interface Article {
   content?: string | null;
   source?: string | null;
   published_at?: string | null;
+  language?: string | null;
   processed: boolean;
   created_at?: string;
+  risk_score?: number | null;
+  reputation_score?: number | null;
+  category?: string | null;
+  score_recorded_at?: string | null;
 }
 
 // ─── API Functions ────────────────────────────────────────────────────────────
@@ -101,8 +109,11 @@ export interface Article {
 export const getCompanies = (): Promise<Company[]> =>
   api.get<Company[]>('/companies').then((r) => r.data);
 
-export const getCompanyScore = (id: number): Promise<CompanyScoreResponse> =>
-  api.get<CompanyScoreResponse>(`/companies/${id}/score`).then((r) => r.data);
+export const getCompanyScore = (
+  id: number,
+  params?: { days?: number }
+): Promise<CompanyScoreResponse> =>
+  api.get<CompanyScoreResponse>(`/companies/${id}/score`, { params }).then((r) => r.data);
 
 export const getCompanyDetail = (id: number): Promise<Company> =>
   api.get<Company>(`/companies/${id}`).then((r) => r.data);

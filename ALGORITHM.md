@@ -6,6 +6,8 @@ This document describes the **deterministic risk scoring algorithm** used in the
 
 **Key Philosophy**: The algorithm separates data extraction (handled by LLM) from risk calculation (deterministic, auditable).
 
+**Multilingual Support**: Articles are processed with lightweight language detection and multilingual AML/reputation dictionaries for Polish, English, German, French, Spanish, Ukrainian, and Russian. Equivalent risk concepts such as `łapówka`, `bribe`, `Bestechung`, `pot-de-vin`, and `soborno` are normalized into one canonical risk category.
+
 ---
 
 ## System Architecture
@@ -14,6 +16,7 @@ This document describes the **deterministic risk scoring algorithm** used in the
 Input: News Article
   ↓
 LLM or Heuristic Analysis
+  ├─ Detect article language (PL/EN/DE/FR/ES/UK/RU)
   ├─ Extract companies mentioned
   ├─ Extract risk events (category, severity, certainty)
   ├─ Extract keywords (with weights)

@@ -3,12 +3,14 @@
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session
 
+from analyzer import detect_article_language
 from database import get_db
 from elastic import index_company, search_companies
 from models import Article, Company, ScoreHistory
@@ -206,6 +208,9 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         id=company.id,
         name=company.name,
         nip=company.nip,
+        isin=company.isin,
+        industry=company.industry,
+        aliases=_company_aliases(company),
         current_score=company.current_score,
         created_at=company.created_at,
         ticker_gpw=company.ticker_gpw,
@@ -213,6 +218,18 @@ def _company_response(company: Company, db: Session) -> CompanyResponse:
         momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
         sanctions=SanctionsCheck(**sanctions),
     )
+
+
+def _company_aliases(company: Company) -> list[str]:
+    if not company.aliases:
+        return []
+    try:
+        parsed = json.loads(company.aliases)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    if not isinstance(parsed, list):
+        return []
+    return [str(item).strip() for item in parsed if str(item).strip()]
 
 
 def _risk_momentum(
@@ -278,23 +295,118 @@ def get_company_articles(
         raise HTTPException(status_code=404, detail="Company not found")
 
     cutoff = datetime.utcnow() - timedelta(days=days)
-    article_ids_stmt = (
-        select(ScoreHistory.article_id)
-        .where(
+    score_rows = (
+        db.query(ScoreHistory)
+        .join(Article, Article.id == ScoreHistory.article_id)
+        .filter(
             ScoreHistory.company_id == company_id,
             ScoreHistory.article_id.is_not(None),
             ScoreHistory.recorded_at >= cutoff,
         )
-        .distinct()
-    )
-
-    return (
-        db.query(Article)
-        .filter(Article.id.in_(article_ids_stmt))
-        .order_by(Article.published_at.desc(), Article.id.desc())
-        .limit(limit)
+        .order_by(Article.published_at.desc(), ScoreHistory.id.desc())
         .all()
     )
+
+    deduped_scores: list[ScoreHistory] = []
+    seen_article_ids: set[int] = set()
+    for score in score_rows:
+        if score.article_id is None or score.article_id in seen_article_ids:
+            continue
+        seen_article_ids.add(score.article_id)
+        deduped_scores.append(score)
+        if len(deduped_scores) >= limit:
+            break
+
+    if not deduped_scores:
+        return []
+
+    articles_by_id = {
+        article.id: article
+        for article in db.query(Article)
+        .filter(Article.id.in_([score.article_id for score in deduped_scores]))
+        .all()
+    }
+
+    return [
+        _article_response(articles_by_id[score.article_id], score)
+        for score in deduped_scores
+        if score.article_id in articles_by_id
+    ]
+
+
+def _article_response(article: Article, score: ScoreHistory | None = None) -> ArticleResponse:
+    return ArticleResponse(
+        id=article.id,
+        url=article.url,
+        title=article.title,
+        content=article.content,
+        source=article.source,
+        published_at=article.published_at,
+        language=detect_article_language(f"{article.title or ''}\n{article.content or ''}"),
+        processed=article.processed,
+        created_at=article.created_at,
+        risk_score=score.risk_score if score else None,
+        reputation_score=score.score if score else None,
+        category=score.category if score else None,
+        score_recorded_at=score.recorded_at if score else None,
+    )
+
+
+def _reputation_risk_level(score: float | int | None) -> str:
+    value = float(score or 0.0)
+    if value < 45.0:
+        return "high"
+    if value < 75.0:
+        return "medium"
+    return "low"
+
+
+def _due_diligence_decision(
+    current_score: float,
+    momentum_7d: dict[str, Any] | None,
+    sanctions: dict[str, Any] | None,
+    articles_count: int,
+    top_categories: list[dict[str, Any]] | None,
+) -> dict[str, Any]:
+    delta_7d = float((momentum_7d or {}).get("delta") or 0.0)
+    top_category = (top_categories or [{}])[0].get("category") if top_categories else None
+
+    if sanctions and (sanctions.get("is_sanctioned") or sanctions.get("status") == "listed"):
+        return {
+            "level": "block",
+            "title": "Block relationship",
+            "reasons": [
+                "Entity appears on a sanctions list.",
+                "Compliance escalation is required before any action.",
+            ],
+        }
+
+    if current_score < 45.0 or delta_7d <= -20.0:
+        return {
+            "level": "block",
+            "title": "Do not proceed",
+            "reasons": [
+                "Reputation score is in the high-risk band or deteriorated rapidly.",
+                f"Evidence window contains {articles_count} associated publication(s).",
+            ],
+        }
+
+    if current_score < 75.0 or delta_7d <= -5.0 or (sanctions and sanctions.get("status") == "unavailable"):
+        reasons = ["Manual review is required before onboarding or renewal."]
+        if top_category:
+            reasons.append(f"Dominant risk category: {top_category}.")
+        if sanctions and sanctions.get("status") == "unavailable":
+            reasons.append("Sanctions status has not been confirmed.")
+        return {"level": "review", "title": "Manual review required", "reasons": reasons}
+
+    return {
+        "level": "proceed",
+        "title": "Proceed",
+        "reasons": [
+            "No sanctions hit and low reputation risk profile.",
+            "No material short-term deterioration detected.",
+        ],
+    }
 
 
 # GET /companies/{company_id}/export
@@ -320,9 +432,7 @@ def export_company_report(
     )
     articles_count = db.query(Article).filter(Article.id.in_(article_ids_stmt)).count()
 
-    # Get risk level
-    from analyzer import risk_level_from_score
-    risk_level = risk_level_from_score(company.current_score)
+    risk_level = _reputation_risk_level(company.current_score)
 
     # Get sanctions
     sanctions_data = check_sanctions(company.name, company.nip)
@@ -339,17 +449,26 @@ def export_company_report(
             for cat, points in sorted(categories.items(), key=lambda x: x[1], reverse=True)
         ]
 
+    decision = _due_diligence_decision(
+        current_score=company.current_score,
+        momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
+        sanctions=sanctions_data,
+        articles_count=articles_count,
+        top_categories=top_categories,
+    )
+
     # Generate PDF
     pdf_bytes = generate_risk_report(
         company_id=company.id,
         company_name=company.name,
         nip=company.nip,
         current_score=company.current_score,
-        risk_level=risk_level.value,
+        risk_level=risk_level,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         momentum_30d=score_resp.momentum_30d.model_dump() if score_resp.momentum_30d else None,
         top_categories=top_categories,
         sanctions=sanctions_data,
+        decision=decision,
         articles_count=articles_count,
     )
 
