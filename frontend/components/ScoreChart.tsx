@@ -36,14 +36,14 @@ const lightChart = {
 };
 
 const darkChart = {
-  line: '#7eb6f0',
-  dotStroke: '#7eb6f0',
-  dotFill: '#0b1220',
-  activeDotFill: '#7eb6f0',
-  axis: 'rgba(238,244,251,0.28)',
-  axisTick: '#a1afc1',
-  grid: 'rgba(238,244,251,0.08)',
-  cursor: 'rgba(126,182,240,0.35)',
+  line: '#f0c95a',
+  dotStroke: '#f0c95a',
+  dotFill: '#100d07',
+  activeDotFill: '#f0c95a',
+  axis: 'rgba(255,247,220,0.28)',
+  axisTick: '#c4a866',
+  grid: 'rgba(240,201,90,0.10)',
+  cursor: 'rgba(240,201,90,0.35)',
   refMedium: 'rgba(212,165,90,0.55)',
   refMediumLabel: '#d4a55a',
   refHigh: 'rgba(232,117,131,0.55)',

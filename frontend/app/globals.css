@@ -50,30 +50,32 @@
 
   --brand-bg: var(--gov-blue);
   --brand-fg: #ffffff;
+  --accent-fg: #ffffff;
+  --accent-rule: rgba(255, 255, 255, 0.22);
 }
 
 [data-theme="dark"] {
-  --paper: #0b1220;
-  --paper-2: #101a2c;
-  --surface: #151f31;
-  --surface-alt: #111b2d;
+  --paper: #050505;
+  --paper-2: #0b0905;
+  --surface: #100d07;
+  --surface-alt: #171207;
 
-  --rule: #26354d;
-  --border: #3a4a62;
-  --border-strong: #6f819c;
+  --rule: #332611;
+  --border: #5b431d;
+  --border-strong: #a77b2a;
 
-  --ink: #eef4fb;
-  --ink-2: #d0dae8;
-  --ink-muted: #a1afc1;
-  --ink-faint: #748399;
+  --ink: #fff7dc;
+  --ink-2: #e6d5a5;
+  --ink-muted: #c4a866;
+  --ink-faint: #8d753c;
 
-  --gov-blue: #7eb6f0;
-  --gov-blue-2: #a8cff5;
-  --gov-blue-3: #142b47;
+  --gov-blue: #d4a63a;
+  --gov-blue-2: #f0c95a;
+  --gov-blue-3: #241803;
   --navy: var(--gov-blue);
   --navy-2: var(--gov-blue-2);
-  --link: #9ecbff;
-  --link-hover: #c7e1ff;
+  --link: #f0c95a;
+  --link-hover: #ffe8a3;
 
   --crimson: #ff6b80;
   --crimson-2: #ff9aaa;
@@ -89,15 +91,17 @@
   --risk-low-bg: #14291d;
   --risk-low-rule: #3c7952;
 
-  --focus: #ffd400;
-  --input-focus-bg: #1a2740;
-  --skeleton-pulse: rgba(255, 255, 255, 0.055);
-  --texture: rgba(255, 255, 255, 0.035);
-  --grid-axis: rgba(238, 244, 251, 0.30);
-  --grid-line: rgba(238, 244, 251, 0.08);
+  --focus: #f0c95a;
+  --input-focus-bg: #1e1607;
+  --skeleton-pulse: rgba(240, 201, 90, 0.09);
+  --texture: rgba(240, 201, 90, 0.045);
+  --grid-axis: rgba(255, 247, 220, 0.30);
+  --grid-line: rgba(240, 201, 90, 0.10);
 
-  --brand-bg: #071021;
-  --brand-fg: #ffffff;
+  --brand-bg: #050505;
+  --brand-fg: #f0c95a;
+  --accent-fg: #080604;
+  --accent-rule: rgba(8, 6, 4, 0.28);
 }
 
 @theme inline {
@@ -188,7 +192,7 @@ a.no-underline { text-decoration: none; }
   min-height: 34px;
   padding: 0 12px;
   background: var(--gov-blue);
-  color: #ffffff;
+  color: var(--accent-fg);
   border: 1px solid var(--gov-blue);
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -230,7 +234,7 @@ a.no-underline { text-decoration: none; }
   gap: 16px;
   padding: 10px 14px;
   background: var(--gov-blue);
-  color: #ffffff;
+  color: var(--accent-fg);
   border: 1px solid var(--gov-blue);
   font-size: 12px;
   font-weight: 800;
@@ -329,7 +333,7 @@ a.no-underline { text-decoration: none; }
   color: var(--ink);
   transition: color 160ms ease;
 }
-.pill-switch__btn[aria-pressed="true"] { color: #ffffff; }
+.pill-switch__btn[aria-pressed="true"] { color: var(--accent-fg); }
 .pill-switch__btn:hover[aria-pressed="false"] { color: var(--link); }
 
 .lang-switch .pill-switch__btn,
@@ -378,8 +382,8 @@ a.no-underline { text-decoration: none; }
   text-transform: uppercase;
   transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
 }
-.doc-btn:hover { background: var(--gov-blue); border-color: var(--gov-blue); color: #ffffff; }
-.doc-btn--primary { background: var(--gov-blue); border-color: var(--gov-blue); color: #ffffff; }
+.doc-btn:hover { background: var(--gov-blue); border-color: var(--gov-blue); color: var(--accent-fg); }
+.doc-btn--primary { background: var(--gov-blue); border-color: var(--gov-blue); color: var(--accent-fg); }
 .doc-btn--primary:hover { background: var(--surface); color: var(--gov-blue); }
 .doc-btn--danger { border-color: var(--crimson); color: var(--crimson); }
 .doc-btn--danger:hover { background: var(--crimson); color: #ffffff; }

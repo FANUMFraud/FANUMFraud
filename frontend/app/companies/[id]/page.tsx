@@ -586,7 +586,7 @@ export default function CompanyDetailPage() {
                     aria-pressed={historyDays === days}
                     className={`px-3 py-2 text-[11px] uppercase tracking-[0.08em] font-extrabold border-r last:border-r-0 border-[var(--border-strong)] transition-colors ${
                       historyDays === days
-                        ? 'bg-[var(--gov-blue)] text-white'
+                        ? 'bg-[var(--gov-blue)] text-[var(--accent-fg)]'
                         : 'bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--surface-alt)]'
                     }`}
                   >

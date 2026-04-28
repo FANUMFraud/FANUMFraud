@@ -19,7 +19,13 @@ from elastic import index_company
 from identifiers import validate_nip
 from models import Article, Company, ScoreHistory
 from pipeline.ingest import contains_risk_keywords
-from pipeline.processor import _as_db_datetime, _build_signal, _compute_company_score, _pick_category
+from pipeline.processor import (
+    _as_db_datetime,
+    _build_signal,
+    _compute_company_score,
+    _pick_category,
+    sync_company_current_score,
+)
 from scorer import ReputationScorer
 
 log = logging.getLogger(__name__)
@@ -140,6 +146,8 @@ def run_live_company_search(
             relevant_articles.append(article)
             if score_created:
                 stats["articles_scored"] += 1
+
+        sync_company_current_score(db, company)
 
         if not company.nip:
             extracted = _extract_nip_from_articles(relevant_articles)
@@ -277,7 +285,7 @@ def _score_live_article(
 
     if signal.risk_score <= 0 and not contains_risk_keywords(article.content):
         risk_score = 0.0
-        score = company.current_score or 100.0
+        score = _compute_company_score(db, scorer, company.id, signal)
     else:
         risk_score = signal.risk_score
         score = _compute_company_score(db, scorer, company.id, signal, article.published_at)
@@ -292,7 +300,6 @@ def _score_live_article(
             recorded_at=_as_db_datetime(article.published_at or datetime.now(UTC)),
         )
     )
-    company.current_score = score
     return True
 
 

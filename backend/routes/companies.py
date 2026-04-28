@@ -17,6 +17,7 @@ from identifiers import ensure_nip_registry, merge_nip_check, nip_check, normali
 from models import Article, Company, ScoreHistory
 from pipeline.company_registry import sync_companies_from_registry
 from pipeline.live_search import run_live_company_search
+from pipeline.processor import latest_company_score
 from pipeline.watchlist import ensure_watchlist_companies
 from reports import generate_risk_report
 from sanctions import check_sanctions
@@ -87,7 +88,7 @@ def search(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
                 "id": r.id,
                 "name": r.name,
                 "nip": r.nip,
-                "current_score": r.current_score,
+                "current_score": _current_company_score(db, r),
             }
             for r in rows
         ]
@@ -197,11 +198,12 @@ def get_company_score(
         .all()
     )
 
+    current_score = _current_company_score(db, company)
     return CompanyScoreResponse(
         company_id=company.id,
-        current_score=company.current_score,
-        momentum_7d=_risk_momentum(db, company.id, company.current_score, 7),
-        momentum_30d=_risk_momentum(db, company.id, company.current_score, 30),
+        current_score=current_score,
+        momentum_7d=_risk_momentum(db, company.id, current_score, 7),
+        momentum_30d=_risk_momentum(db, company.id, current_score, 30),
         history=[ScorePoint.model_validate(h) for h in history],
     )
 
@@ -221,9 +223,10 @@ def _company_response(
     else:
         registry_data = None
     nip_check_data = merge_nip_check(checksum_check, registry_data)
+    current_score = _current_company_score(db, company)
     evidence_quality_obj = _evidence_quality(db, company.id)
-    momentum_7d = _risk_momentum(db, company.id, company.current_score, 7)
-    momentum_30d = _risk_momentum(db, company.id, company.current_score, 30)
+    momentum_7d = _risk_momentum(db, company.id, current_score, 7)
+    momentum_30d = _risk_momentum(db, company.id, current_score, 30)
     
     # Get score history for top categories
     score_resp = get_company_score(company.id, days=90, db=db)
@@ -250,7 +253,7 @@ def _company_response(
     
     # Compute decision
     decision_data = _due_diligence_decision(
-        current_score=company.current_score,
+        current_score=current_score,
         momentum_7d=momentum_7d.model_dump() if momentum_7d else None,
         sanctions=sanctions,
         nip_check_data=nip_check_data,
@@ -267,7 +270,7 @@ def _company_response(
         isin=company.isin,
         industry=company.industry,
         aliases=_company_aliases(company),
-        current_score=company.current_score,
+        current_score=current_score,
         created_at=company.created_at,
         ticker_gpw=company.ticker_gpw,
         momentum_7d=momentum_7d,
@@ -276,6 +279,13 @@ def _company_response(
         evidence_quality=evidence_quality_obj,
         decision=Decision(**decision_data) if decision_data else None,
     )
+
+
+def _current_company_score(db: Session, company: Company) -> float:
+    latest_score = latest_company_score(db, company.id)
+    if latest_score is not None:
+        return latest_score
+    return float(company.current_score or 100.0)
 
 
 def _company_aliases(company: Company) -> list[str]:
@@ -611,7 +621,8 @@ def export_company_report(
     )
     articles_count = db.query(Article).filter(Article.id.in_(article_ids_stmt)).count()
 
-    risk_level = _reputation_risk_level(company.current_score)
+    current_score = score_resp.current_score
+    risk_level = _reputation_risk_level(current_score)
 
     # Get sanctions
     sanctions_data = check_sanctions(company.name, company.nip)
@@ -639,7 +650,7 @@ def export_company_report(
     nip_check_combined = merge_nip_check(checksum_check, registry_data)
 
     decision = _due_diligence_decision(
-        current_score=company.current_score,
+        current_score=current_score,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         sanctions=sanctions_data,
         nip_check_data=nip_check_combined,
@@ -654,7 +665,7 @@ def export_company_report(
         company_name=company.name,
         nip=company.nip,
         nip_check=nip_check_combined,
-        current_score=company.current_score,
+        current_score=current_score,
         risk_level=risk_level,
         momentum_7d=score_resp.momentum_7d.model_dump() if score_resp.momentum_7d else None,
         momentum_30d=score_resp.momentum_30d.model_dump() if score_resp.momentum_30d else None,

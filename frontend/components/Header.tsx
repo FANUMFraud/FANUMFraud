@@ -15,13 +15,13 @@ export default function Header({ rightSlot, leftSlot }: Props) {
 
   return (
     <header className="border-b border-[var(--border-strong)]">
-      <div className="bg-[var(--gov-blue)] text-white">
+      <div className="bg-[var(--brand-bg)] text-[var(--brand-fg)] border-b border-[var(--gov-blue)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-9 flex items-center justify-between gap-4 text-[11px]">
           <span className="uppercase tracking-[0.16em] font-extrabold">
             {locale === 'pl' ? 'System oceny ryzyka AML' : 'AML risk assessment system'}
           </span>
           {rightSlot && (
-            <div className="hidden md:flex items-center text-white/85">
+            <div className="hidden md:flex items-center text-[var(--brand-fg)] opacity-85">
               {rightSlot}
             </div>
           )}
@@ -37,7 +37,7 @@ export default function Header({ rightSlot, leftSlot }: Props) {
               aria-label="FanumFraud"
             >
               <span
-                className="inline-flex items-center justify-center w-12 h-12 shrink-0 border-2 text-white font-black tracking-tight"
+                className="inline-flex items-center justify-center w-12 h-12 shrink-0 border-2 text-[var(--accent-fg)] font-black tracking-tight"
                 style={{ background: 'var(--gov-blue)', borderColor: 'var(--gov-blue)' }}
               >
                 FF

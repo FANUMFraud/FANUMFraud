@@ -201,7 +201,7 @@ def process_pending_articles(batch_size: int = DEFAULT_BATCH_SIZE) -> dict[str, 
 
                     company = db.get(Company, company_id)
                     if company is not None:
-                        company.current_score = new_score
+                        sync_company_current_score(db, company)
                     stats["scored_companies"] += 1
 
                 article.processed = True
@@ -359,6 +359,27 @@ def _compute_company_score(
         return _clamp(adjusted_score, 0.0, 100.0)
 
     return base_score
+
+
+def latest_company_score(db: Session, company_id: int) -> float | None:
+    latest = (
+        db.query(ScoreHistory)
+        .filter(ScoreHistory.company_id == company_id)
+        .order_by(ScoreHistory.recorded_at.desc(), ScoreHistory.id.desc())
+        .first()
+    )
+    if latest is None:
+        return None
+    return float(latest.score)
+
+
+def sync_company_current_score(db: Session, company: Company) -> float:
+    """Keep the denormalized score aligned with the newest history point."""
+    latest_score = latest_company_score(db, company.id)
+    if latest_score is None:
+        return float(company.current_score or 100.0)
+    company.current_score = latest_score
+    return latest_score
 
 
 def _signal_from_history(row: ScoreHistory) -> RiskSignal:

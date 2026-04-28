@@ -160,10 +160,10 @@ function RegistrySection({ title, companies, locale, nipLabel, riskLabels, anima
 
       <div className="hidden lg:block border border-[var(--border)] bg-[var(--surface)] overflow-x-auto">
         <table className="w-full border-collapse text-sm">
-          <thead className="bg-[var(--gov-blue)] text-white">
+          <thead className="bg-[var(--gov-blue)] text-[var(--accent-fg)]">
             <tr>
               {[labels.entity, labels.source, labels.stock, labels.score, labels.risk, labels.trend, labels.sanctions, labels.evidence].map((label) => (
-                <th key={label} className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.08em] font-extrabold border-r border-white/20 last:border-r-0">
+                <th key={label} className="px-4 py-3 text-left text-[11px] uppercase tracking-[0.08em] font-extrabold border-r border-[var(--accent-rule)] last:border-r-0">
                   {label}
                 </th>
               ))}
@@ -490,7 +490,7 @@ export default function DashboardPage() {
                           'px-3 h-8 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors',
                           i !== 0 ? 'border-l border-[var(--ink)]' : '',
                           sort === val
-                            ? 'bg-[var(--gov-blue)] text-white'
+                            ? 'bg-[var(--gov-blue)] text-[var(--accent-fg)]'
                             : 'bg-[var(--surface)] text-[var(--ink)] hover:bg-[var(--paper-2)]',
                         ].join(' ')}
                       >
